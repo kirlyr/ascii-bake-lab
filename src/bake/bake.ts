@@ -1,14 +1,31 @@
-// Inti bake: render model 3D → grid sel (char + depth + warna) per layer per frame.
-// Three.js hanya dipakai di sini (dev). Output = BakeFile JSON.
+// Inti bake: render model 3D → grid sel (shade level + part id + depth) per layer per frame.
+// Three.js hanya dipakai di sini (dev). Output = BakeFile JSON v2.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { b64encode, EMPTY_DEPTH, type BakeFile, type FrameData } from '../shared/format';
+import { b64encode, EMPTY_DEPTH, MAX_PARTS, MAX_SHADES, packCell, type BakeFile, type BladeSocket, type FrameData, type SocketPoint } from '../shared/format';
 import { buildGlyphSet, makeMatcher, DIMS, REG_X, REG_Y } from './glyphs';
 
 export interface LayerDef {
   label: string;
-  meshes: string[];
+  /** part → mesh. Part menentukan material di runtime (lihat src/shared/materials.ts). */
+  parts: Record<string, string[]>;
 }
+
+/**
+ * Bagi satu mesh senjata jadi dua part di sepanjang sumbu lokalnya (mis. hilt | blade),
+ * sekaligus sumber socket blade: pangkal = titik potong, ujung = ujung sumbu.
+ */
+export interface BladeSplit {
+  mesh: string;
+  axis: 'x' | 'y' | 'z';
+  /** posisi potong di koordinat lokal mesh. */
+  at: number;
+  /** part di sisi < at dan >= at. Ujung blade = sisi `above`. */
+  below: string;
+  above: string;
+}
+
+const layerMeshes = (l: LayerDef) => Object.values(l.parts).flat();
 
 export interface BakeParams {
   modelUrl: string;
@@ -28,8 +45,10 @@ export interface BakeParams {
   pitch: number;
   clips: Record<string, string>; // nama output → nama clip di glb
   layers: Record<string, LayerDef>;
+  blade?: BladeSplit;
   /** mesh yang selalu disembunyikan. */
   hidden: string[];
+  /** ramp gelap → terang. Index glyph hasil shape matching = shade level. */
   charset: string;
   /** kecerahan minimum area tertutup (0..1), supaya bagian gelap tetap rapat. */
   minLight: number;
@@ -38,7 +57,6 @@ export interface BakeParams {
   sharpness: number;
   /** cakupan minimum sel (0..1) agar dianggap terisi. */
   minCoverage: number;
-  paletteSize: number;
   /** intensitas lampu: ambient (hemisphere), key (depan-atas), rim (belakang). */
   ambient: number;
   keyLight: number;
@@ -62,12 +80,18 @@ export const DEFAULT_PARAMS: BakeParams = {
   layers: {
     body: {
       label: 'Badan',
-      meshes: ['Knight_Body', 'Knight_Head', 'Knight_ArmLeft', 'Knight_ArmRight', 'Knight_LegLeft', 'Knight_LegRight', 'Knight_Cape'],
+      parts: {
+        armor: ['Knight_Body', 'Knight_ArmLeft', 'Knight_ArmRight', 'Knight_LegLeft', 'Knight_LegRight'],
+        skin: ['Knight_Head'],
+        cloth: ['Knight_Cape'],
+      },
     },
-    helmet: { label: 'Helm', meshes: ['Knight_Helmet'] },
-    weapon: { label: 'Senjata', meshes: ['1H_Sword'] },
-    shield: { label: 'Perisai', meshes: ['Round_Shield'] },
+    helmet: { label: 'Helm', parts: { helmet: ['Knight_Helmet'] } },
+    weapon: { label: 'Senjata', parts: { blade: ['1H_Sword'] } },
+    shield: { label: 'Perisai', parts: { shield: ['Round_Shield'] } },
   },
+  // Pedang KayKit: sumbu lokal +Y, pommel -0.37, grip di 0, guard 0.15..0.25, ujung 1.41.
+  blade: { mesh: '1H_Sword', axis: 'y', at: 0.26, below: 'hilt', above: 'blade' },
   hidden: ['1H_Sword_Offhand', 'Badge_Shield', 'Rectangle_Shield', 'Spike_Shield', '2H_Sword'],
   // Ramp density gelap → terang. Shape vector tetap memilih di antara glyph ini,
   // jadi tepi tetap mengikuti silhouette. Charset penuh terlalu ramai (lihat README).
@@ -76,7 +100,6 @@ export const DEFAULT_PARAMS: BakeParams = {
   gamma: 1.1,
   sharpness: 2.0,
   minCoverage: 0.12,
-  paletteSize: 32,
   ambient: 0.5,
   keyLight: 3.5,
   rimLight: 1.2,
@@ -109,6 +132,40 @@ function makeDepthMaterial(near: number, far: number) {
     uniforms: { uNear: { value: near }, uFar: { value: far } },
   });
 }
+
+// Pass part id: tiap mesh dapat material ini dengan id-nya sendiri. Output = (id + 1) / 255,
+// 0 = kosong. Mesh senjata yang di-split memilih id berdasarkan posisi lokal di sumbu.
+const idVert = /* glsl */ `
+#include <common>
+#include <skinning_pars_vertex>
+uniform vec3 uAxis;
+varying float vT;
+void main() {
+  #include <skinbase_vertex>
+  #include <begin_vertex>
+  vT = dot(position, uAxis);
+  #include <skinning_vertex>
+  #include <project_vertex>
+}`;
+const idFrag = /* glsl */ `
+uniform float uBelow;
+uniform float uAbove;
+uniform float uAt;
+varying float vT;
+void main() {
+  float id = vT < uAt ? uBelow : uAbove;
+  gl_FragColor = vec4((id + 1.0) / 255.0, 0.0, 0.0, 1.0);
+}`;
+
+function makeIdMaterial(below: number, above = below, axis = new THREE.Vector3(0, 1, 0), at = 0) {
+  return new THREE.ShaderMaterial({
+    vertexShader: idVert,
+    fragmentShader: idFrag,
+    uniforms: { uAxis: { value: axis }, uAt: { value: at }, uBelow: { value: below }, uAbove: { value: above } },
+  });
+}
+
+const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
 
 export interface BakeContext {
   renderer: THREE.WebGLRenderer;
@@ -257,7 +314,8 @@ interface RawCells {
   /** shape vector per sel, panjang cols*rows*DIMS */
   shape: Float32Array;
   coverage: Float32Array;
-  rgb: Float32Array;
+  /** part id mayoritas di sel. */
+  part: Uint8Array;
   depth: Uint8Array;
 }
 
@@ -269,6 +327,7 @@ function sampleCells(
   p: BakeParams,
   col: Uint8Array,
   dep: Uint8Array,
+  ids: Uint8Array,
   W: number,
   H: number,
   levels: { lo: number; hi: number },
@@ -278,7 +337,8 @@ function sampleCells(
   const n = p.cols * p.rows;
   const shape = new Float32Array(n * DIMS);
   const coverage = new Float32Array(n);
-  const rgb = new Float32Array(n * 3);
+  const part = new Uint8Array(n);
+  const votes = new Uint16Array(MAX_PARTS + 1);
   const depth = new Uint8Array(n).fill(EMPTY_DEPTH);
   const regCount = new Float32Array(DIMS);
   const range = Math.max(1e-3, levels.hi - levels.lo);
@@ -286,9 +346,9 @@ function sampleCells(
     for (let cx = 0; cx < p.cols; cx++) {
       const ci = cy * p.cols + cx;
       let cov = 0;
-      let r = 0, g = 0, b = 0;
       let dmin = 255;
       regCount.fill(0);
+      votes.fill(0);
       for (let sy = 0; sy < sh; sy++) {
         const py = cy * sh + sy;
         const row = H - 1 - py; // readPixels bottom-up
@@ -301,9 +361,7 @@ function sampleCells(
           const i = (row * W + px) * 4;
           if (col[i + 3] < 128) continue;
           cov++;
-          r += col[i];
-          g += col[i + 1];
-          b += col[i + 2];
+          votes[Math.min(MAX_PARTS, ids[i])]++;
           const lum = Math.min(1, Math.max(0, (luma(col[i], col[i + 1], col[i + 2]) - levels.lo) / range));
           shape[ci * DIMS + ri] += p.minLight + (1 - p.minLight) * Math.pow(lum, p.gamma);
           if (dep[i + 3] > 0) dmin = Math.min(dmin, dep[i]);
@@ -312,55 +370,20 @@ function sampleCells(
       for (let ri = 0; ri < DIMS; ri++) shape[ci * DIMS + ri] /= regCount[ri];
       coverage[ci] = cov / (sw * sh);
       if (cov > 0) {
-        rgb[ci * 3] = r / cov;
-        rgb[ci * 3 + 1] = g / cov;
-        rgb[ci * 3 + 2] = b / cov;
+        let best = 1;
+        for (let k = 2; k <= MAX_PARTS; k++) if (votes[k] > votes[best]) best = k;
+        part[ci] = best - 1;
         depth[ci] = Math.min(254, dmin);
       }
     }
   }
-  return { shape, coverage, rgb, depth };
+  return { shape, coverage, part, depth };
 }
-
-/** k-means sederhana di ruang sRGB untuk palet warna bersama. */
-function buildPalette(samples: number[], k: number): number[][] {
-  const hist = new Map<number, number>();
-  for (let i = 0; i < samples.length; i += 3) {
-    const key = ((samples[i] >> 3) << 10) | ((samples[i + 1] >> 3) << 5) | (samples[i + 2] >> 3);
-    hist.set(key, (hist.get(key) ?? 0) + 1);
-  }
-  const pts = [...hist].map(([key, w]) => ({ c: [((key >> 10) & 31) * 8 + 4, ((key >> 5) & 31) * 8 + 4, (key & 31) * 8 + 4], w }));
-  pts.sort((a, b) => b.w - a.w);
-  let cents = pts.slice(0, Math.min(k, pts.length)).map((p) => [...p.c]);
-  for (let it = 0; it < 12; it++) {
-    const acc = cents.map(() => [0, 0, 0, 0]);
-    for (const p of pts) {
-      const j = nearest(cents, p.c);
-      acc[j][0] += p.c[0] * p.w;
-      acc[j][1] += p.c[1] * p.w;
-      acc[j][2] += p.c[2] * p.w;
-      acc[j][3] += p.w;
-    }
-    cents = acc.map((a, j) => (a[3] ? [a[0] / a[3], a[1] / a[3], a[2] / a[3]] : cents[j]));
-  }
-  return cents.map((c) => c.map(Math.round));
-}
-
-function nearest(cents: number[][], c: number[]) {
-  let best = 0, bd = Infinity;
-  for (let j = 0; j < cents.length; j++) {
-    const d = (cents[j][0] - c[0]) ** 2 + (cents[j][1] - c[1]) ** 2 + (cents[j][2] - c[2]) ** 2;
-    if (d < bd) { bd = d; best = j; }
-  }
-  return best;
-}
-
-const hex = (c: number[]) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
 
 export type Progress = (msg: string) => void;
 
 export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress = () => {}): Promise<BakeFile> {
-  const allLayerMeshes = new Set(Object.values(p.layers).flatMap((l) => l.meshes));
+  const allLayerMeshes = new Set(Object.values(p.layers).flatMap(layerMeshes));
   for (const h of p.hidden) allLayerMeshes.delete(h);
   const cam0 = setupCamera(ctx, p, allLayerMeshes);
   const { near, far } = cam0;
@@ -368,7 +391,51 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   const cam = ctx.camera;
 
   const glyphs = await buildGlyphSet(p.charset, 'JetBrains Mono', p.cellAspect);
+  if (glyphs.chars.length > MAX_SHADES) throw new Error(`charset maksimal ${MAX_SHADES} glyph`);
   const match = makeMatcher(glyphs);
+
+  // Part id global: urutan kemunculan di layer, plus part hasil split blade.
+  const parts: string[] = [];
+  const partOf = new Map<string, number>();
+  const addPart = (name: string) => {
+    if (!parts.includes(name)) parts.push(name);
+    return parts.indexOf(name);
+  };
+  for (const l of Object.values(p.layers)) for (const [part, ms] of Object.entries(l.parts)) for (const m of ms) partOf.set(m, addPart(part));
+  const split = p.blade && ctx.meshes.has(p.blade.mesh) ? p.blade : undefined;
+  if (split) addPart(split.below), addPart(split.above);
+  if (parts.length > MAX_PARTS) throw new Error(`part maksimal ${MAX_PARTS}`);
+
+  // Material pass id per mesh. Mesh di luar layer tetap dapat id (tidak terlihat juga).
+  const idMats = new Map<THREE.Object3D, THREE.ShaderMaterial>();
+  for (const [name, m] of ctx.meshes) {
+    const id = partOf.get(name) ?? 0;
+    idMats.set(m, split?.mesh === name ? makeIdMaterial(parts.indexOf(split.below), parts.indexOf(split.above), AXES[split.axis], split.at) : makeIdMaterial(id));
+  }
+
+  // Socket blade di ruang lokal mesh: pangkal = titik potong, ujung = ujung sumbu sisi `above`.
+  let bladeLocal: { base: THREE.Vector3; tip: THREE.Vector3; mesh: THREE.Object3D } | null = null;
+  if (split) {
+    const mesh = ctx.meshes.get(split.mesh)! as THREE.Mesh;
+    mesh.geometry.computeBoundingBox();
+    const bb = mesh.geometry.boundingBox!;
+    const c = bb.getCenter(new THREE.Vector3());
+    const base = c.clone().setComponent('xyz'.indexOf(split.axis), split.at);
+    const tip = c.clone().setComponent('xyz'.indexOf(split.axis), bb.max[split.axis]);
+    bladeLocal = { base, tip, mesh };
+  }
+  const project = (v: THREE.Vector3): SocketPoint => {
+    const view = v.clone().applyMatrix4(cam.matrixWorldInverse);
+    const ndc = v.clone().project(cam);
+    const d = Math.min(254, Math.max(0, Math.round(((-view.z - near) / (far - near)) * 255)));
+    const r1 = (x: number) => Math.round(x * 10) / 10;
+    return [r1(((ndc.x + 1) / 2) * p.cols), r1(((1 - ndc.y) / 2) * p.rows), d];
+  };
+  const bladeSocket = (): BladeSocket | undefined => {
+    if (!bladeLocal) return undefined;
+    const mw = bladeLocal.mesh.matrixWorld;
+    return { base: project(bladeLocal.base.clone().applyMatrix4(mw)), tip: project(bladeLocal.tip.clone().applyMatrix4(mw)) };
+  };
 
   const sw = p.sub;
   const sh = Math.round(p.sub / p.cellAspect);
@@ -376,6 +443,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   const H = p.rows * sh;
   const colorRT = new THREE.WebGLRenderTarget(W, H, { colorSpace: THREE.SRGBColorSpace });
   const depthRT = new THREE.WebGLRenderTarget(W, H);
+  const idRT = new THREE.WebGLRenderTarget(W, H);
   // Normalisasi depth ke rentang model (bukan near/far kamera) supaya 8-bit cukup presisi.
   const depthMat = makeDepthMaterial(near, far);
 
@@ -385,19 +453,28 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   r.setClearColor(0x000000, 0);
   const colBuf = new Uint8Array(W * H * 4);
   const depBuf = new Uint8Array(W * H * 4);
+  const idBuf = new Uint8Array(W * H * 4);
 
+  const pass = (rt: THREE.WebGLRenderTarget, buf: Uint8Array) => {
+    r.setRenderTarget(rt);
+    r.clear();
+    r.render(ctx.scene, cam);
+    r.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+  };
   const render = () => {
     ctx.scene.overrideMaterial = null;
-    r.setRenderTarget(colorRT);
-    r.clear();
-    r.render(ctx.scene, cam);
-    r.readRenderTargetPixels(colorRT, 0, 0, W, H, colBuf);
+    pass(colorRT, colBuf);
     ctx.scene.overrideMaterial = depthMat;
-    r.setRenderTarget(depthRT);
-    r.clear();
-    r.render(ctx.scene, cam);
-    r.readRenderTargetPixels(depthRT, 0, 0, W, H, depBuf);
+    pass(depthRT, depBuf);
     ctx.scene.overrideMaterial = null;
+    const orig = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+    for (const [m, mat] of idMats) {
+      const mesh = m as THREE.Mesh;
+      orig.set(mesh, mesh.material);
+      mesh.material = mat;
+    }
+    pass(idRT, idBuf);
+    for (const [mesh, mat] of orig) mesh.material = mat;
     r.setRenderTarget(null);
   };
 
@@ -410,34 +487,49 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   lums.sort((a, b) => a - b);
   const levels = { lo: lums[Math.floor(lums.length * 0.02)] ?? 0, hi: lums[Math.floor(lums.length * 0.98)] ?? 1 };
 
-  type Pending = { layer: string; clip: string; cells: RawCells; chars: string[] };
-  const pending: Pending[] = [];
-  const colorSamples: number[] = [];
+  const out: BakeFile = {
+    version: 2,
+    model: p.modelName,
+    cols: p.cols,
+    rows: p.rows,
+    cellAspect: p.cellAspect,
+    fps: p.fps,
+    facing: p.facing,
+    ramp: glyphs.chars.join(''),
+    parts,
+    layers: {},
+    bakedAt: new Date().toISOString(),
+    params: { ...p, modelUrl: undefined, layers: undefined },
+  };
 
   for (const [layerKey, layer] of Object.entries(p.layers)) {
-    setVisible(ctx, new Set(layer.meshes));
+    const meshes = new Set(layerMeshes(layer));
+    out.layers[layerKey] = { label: layer.label, clips: {} };
+    setVisible(ctx, meshes);
+    const withBlade = !!split && meshes.has(split.mesh);
     for (const [clipKey, clipName] of Object.entries(p.clips)) {
       const clip = poseAt(ctx, clipName, 0);
       const n = frameCount(clip, p.fps);
+      const frames: FrameData[] = (out.layers[layerKey].clips[clipKey] = []);
       for (let f = 0; f < n; f++) {
         poseAt(ctx, clipName, f / p.fps);
         render();
-        const cells = sampleCells(p, colBuf, depBuf, W, H, levels);
-        const chars: string[] = new Array(p.cols * p.rows);
+        const cells = sampleCells(p, colBuf, depBuf, idBuf, W, H, levels);
+        const shade = new Uint8Array(p.cols * p.rows);
         const v = new Float32Array(DIMS);
-        for (let ci = 0; ci < chars.length; ci++) {
+        for (let ci = 0; ci < shade.length; ci++) {
           if (cells.coverage[ci] < p.minCoverage) {
-            chars[ci] = ' ';
             cells.depth[ci] = EMPTY_DEPTH;
             continue;
           }
           let m = 0;
           for (let d = 0; d < DIMS; d++) m = Math.max(m, cells.shape[ci * DIMS + d]);
           for (let d = 0; d < DIMS; d++) v[d] = m > 0 ? Math.pow(cells.shape[ci * DIMS + d] / m, p.sharpness) * m : 0;
-          chars[ci] = match(v);
-          colorSamples.push(cells.rgb[ci * 3], cells.rgb[ci * 3 + 1], cells.rgb[ci * 3 + 2]);
+          shade[ci] = match(v);
         }
-        pending.push({ layer: layerKey, clip: clipKey, cells, chars });
+        const frame = cropFrame(p, shade, cells);
+        if (withBlade) frame.blade = bladeSocket();
+        frames.push(frame);
         if (f === 0) onProgress(`${layer.label} / ${clipKey}: ${n} frame`);
         await new Promise((res) => setTimeout(res, 0));
       }
@@ -446,57 +538,30 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   r.setClearColor(prevClear, prevAlpha);
   colorRT.dispose();
   depthRT.dispose();
-
-  onProgress('Membuat palet warna…');
-  const palette = buildPalette(colorSamples, p.paletteSize);
-  const out: BakeFile = {
-    version: 1,
-    model: p.modelName,
-    cols: p.cols,
-    rows: p.rows,
-    cellAspect: p.cellAspect,
-    fps: p.fps,
-    facing: p.facing,
-    palette: palette.map(hex),
-    layers: {},
-    bakedAt: new Date().toISOString(),
-    params: { ...p, modelUrl: undefined, layers: undefined },
-  };
-  for (const [k, l] of Object.entries(p.layers)) out.layers[k] = { label: l.label, clips: {} };
-  const palCache = new Map<number, number>();
-  for (const pd of pending) {
-    const frame = cropFrame(p, pd.chars, pd.cells, (ci) => {
-      const c = [pd.cells.rgb[ci * 3], pd.cells.rgb[ci * 3 + 1], pd.cells.rgb[ci * 3 + 2]];
-      const key = ((c[0] >> 2) << 12) | ((c[1] >> 2) << 6) | (c[2] >> 2);
-      let j = palCache.get(key);
-      if (j === undefined) palCache.set(key, (j = nearest(palette, c)));
-      return j;
-    });
-    (out.layers[pd.layer].clips[pd.clip] ??= []).push(frame);
-  }
+  idRT.dispose();
+  depthMat.dispose();
+  for (const m of idMats.values()) m.dispose();
   return out;
 }
 
-function cropFrame(p: BakeParams, chars: string[], cells: RawCells, colorIndex: (ci: number) => number): FrameData {
+function cropFrame(p: BakeParams, shade: Uint8Array, cells: RawCells): FrameData {
   let x0 = p.cols, y0 = p.rows, x1 = -1, y1 = -1;
   for (let y = 0; y < p.rows; y++)
     for (let x = 0; x < p.cols; x++)
-      if (chars[y * p.cols + x] !== ' ') {
+      if (cells.depth[y * p.cols + x] !== EMPTY_DEPTH) {
         x0 = Math.min(x0, x); x1 = Math.max(x1, x);
         y0 = Math.min(y0, y); y1 = Math.max(y1, y);
       }
-  if (x1 < 0) return { x: 0, y: 0, w: 0, h: 0, chars: '', depth: '', color: '' };
+  if (x1 < 0) return { x: 0, y: 0, w: 0, h: 0, cell: '', depth: '' };
   const w = x1 - x0 + 1;
   const h = y1 - y0 + 1;
-  let s = '';
   const depth = new Uint8Array(w * h);
-  const color = new Uint8Array(w * h);
+  const cell = new Uint8Array(w * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const ci = (y0 + y) * p.cols + (x0 + x);
-      s += chars[ci];
-      depth[y * w + x] = chars[ci] === ' ' ? EMPTY_DEPTH : cells.depth[ci];
-      color[y * w + x] = chars[ci] === ' ' ? 0 : colorIndex(ci);
+      depth[y * w + x] = cells.depth[ci];
+      cell[y * w + x] = cells.depth[ci] === EMPTY_DEPTH ? 0 : packCell(cells.part[ci], shade[ci]);
     }
-  return { x: x0, y: y0, w, h, chars: s, depth: b64encode(depth), color: b64encode(color) };
+  return { x: x0, y: y0, w, h, cell: b64encode(cell), depth: b64encode(depth) };
 }

@@ -25,12 +25,21 @@
       </div>
       <h2>Layer</h2>
       <div id="layers" class="col"></div>
+      <h2>Material blade</h2>
+      <div id="blade" class="row" role="group" aria-label="Material blade"></div>
+      <h2>Rune</h2>
+      <div id="rune" class="row" role="group" aria-label="Rune">
+        <button data-rune="none" aria-pressed="true">Tanpa</button>
+        <button data-rune="fire" aria-pressed="false">Api ^</button>
+      </div>
+      <p id="rune-note" class="muted" hidden>Partikel mati karena prefers-reduced-motion.</p>
       <h2>Warna</h2>
       <div class="row" role="group" aria-label="Warna">
-        <button data-mode="texture" aria-pressed="true">Tekstur</button>
-        <button data-mode="medieval" aria-pressed="false">Medieval</button>
+        <button data-mode="material" aria-pressed="true">Material</button>
+        <button data-mode="part" aria-pressed="false">Part</button>
         <button data-mode="depth" aria-pressed="false">Depth</button>
       </div>
+      <div class="col"><label><input type="checkbox" id="sockets"> Penanda socket blade</label></div>
       <div class="row"><button id="play" aria-pressed="true">Pause</button></div>
       <p class="muted">Tahan ← / → untuk berjalan.</p>
       <p id="info" class="muted"></p>

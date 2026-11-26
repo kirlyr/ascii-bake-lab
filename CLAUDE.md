@@ -15,7 +15,7 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Palet: latar `#120e0a`, panel `#1b1510`, border `#4a3b2a`, teks `#ead9b5`, muted `#b0a083`, aksen `#d4a64a`,
   merah `#d8644c`, hijau `#8fae6a`. Animasi mati saat `prefers-reduced-motion`.
 - Karakter: bake per layer (badan/helm/armor/senjata/pet), tiap sel = shade level + part id + depth (bukan char
-  final, supaya material bisa di-swap di runtime; prototype saat ini masih char final), compose runtime pilih
+  final, supaya material bisa di-swap di runtime; sudah diimplementasi, format v2), compose runtime pilih
   depth terdekat. Satu sudut kamera samping, arah sebaliknya = mirror. v1: 2–3 varian per slot.
 - Proporsi karakter **realistis, bukan chibi** (seperti referensi IG ansenjeo), tinggi ±90 baris, font kecil supaya rapat.
 - Three.js hanya di bake tool (dev). Build produksi tidak boleh membawa Three.js.
@@ -27,11 +27,12 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   untuk hasil dan ukuran file.
 - Uji proporsi realistis: preset `soldier` (Mixamo, glb tidak di-commit), 90 baris. KayKit Knight (chibi) hanya
   dipakai untuk membuktikan pipeline.
+- Format bake v2 (shade level + part id + depth, socket blade, material swap, rune api demo) selesai, lihat README.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
 1. Pilih aset final non-chibi bertema medieval + cek lisensinya (lihat "Masih terbuka" di `docs/PLAN.md`).
-2. Optimasi format output jika perlu.
+2. Optimasi format output jika perlu (biner + delta).
 3. Buat repo portfolio, pindahkan bake tool, mulai dari intro + Character (Home).
 
 ## Aturan kerja user

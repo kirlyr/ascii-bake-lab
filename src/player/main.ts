@@ -2,6 +2,8 @@
 import type { BakeFile } from '../shared/format';
 import { composeFrame, createGrid, decodeSprite } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
+import { RUNES, RuneEmitter, type RuneKey } from '../shared/runes';
+import { BLADE_MATERIALS, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
 
 const MODEL = new URLSearchParams(location.search).get('model') ?? 'knight';
 const URL_JSON = `${import.meta.env.BASE_URL}baked/${MODEL}.json`;
@@ -17,15 +19,19 @@ await document.fonts.load('700 10px "JetBrains Mono"');
 
 const sprite = decodeSprite(file);
 const grid = createGrid(file.cols, file.rows);
-const view = new AsciiCanvas($<HTMLCanvasElement>('#stage'), file.palette, file.cellAspect);
+const view = new AsciiCanvas($<HTMLCanvasElement>('#stage'), file.cellAspect);
 view.resize(file.cols, file.rows);
 
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const state = {
   clip: 'idle',
   facing: file.facing as 'left' | 'right',
-  mode: 'texture' as ColorMode,
+  mode: 'material' as ColorMode,
+  blade: 'iron' as MaterialKey,
+  sockets: false,
   layers: new Set(Object.keys(file.layers)),
-  playing: !matchMedia('(prefers-reduced-motion: reduce)').matches,
+  playing: !reducedMotion,
+  rune: null as RuneEmitter | null,
   frame: 0,
 };
 
@@ -39,6 +45,20 @@ layersEl.addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;
   if (input.checked) state.layers.add(input.value);
   else state.layers.delete(input.value);
+  draw();
+});
+
+// Material blade: ganti tabel glyph/warna part "blade" saja, tanpa re-bake.
+const applyLook = () => view.setLook({ parts: file.parts, ramp: file.ramp, materials: lookFor(file.parts, { blade: state.blade }) });
+applyLook();
+const bladeEl = $<HTMLElement>('#blade');
+if (file.parts.includes('blade')) {
+  for (const k of BLADE_MATERIALS) bladeEl.insertAdjacentHTML('beforeend', `<button data-blade="${k}" aria-pressed="${k === state.blade}">${MATERIALS[k].label}</button>`);
+} else {
+  bladeEl.innerHTML = '<span class="muted">Model ini tanpa blade.</span>';
+}
+$<HTMLInputElement>('#sockets').addEventListener('change', (e) => {
+  state.sockets = (e.target as HTMLInputElement).checked;
   draw();
 });
 
@@ -58,6 +78,15 @@ const setClip = bindGroup('clip', (v) => {
 });
 const setDir = bindGroup('dir', (v) => (state.facing = v as 'left' | 'right'));
 bindGroup('mode', (v) => (state.mode = v as ColorMode));
+bindGroup('rune', (v) => {
+  // Partikel = animasi, jadi mati total saat reduced-motion.
+  state.rune = v === 'none' || reducedMotion ? null : new RuneEmitter(RUNES[v as RuneKey]);
+  $<HTMLElement>('#rune-note').hidden = !(reducedMotion && v !== 'none');
+});
+bindGroup('blade', (v) => {
+  state.blade = v as MaterialKey;
+  applyLook();
+});
 
 const playBtn = $<HTMLButtonElement>('#play');
 const syncPlay = () => {
@@ -80,22 +109,37 @@ addEventListener('keyup', (e) => {
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') setClip('idle');
 });
 
+function paint() {
+  view.draw(grid, state.mode, state.sockets);
+  state.rune?.draw(view.ctx, grid, view.cellW, view.cellH, view.background);
+}
+const compose = () => composeFrame(sprite, grid, state.clip, state.frame, [...state.layers], state.facing !== file.facing);
 function draw() {
-  composeFrame(sprite, grid, state.clip, state.frame, [...state.layers], state.facing !== file.facing);
-  view.draw(grid, state.mode);
+  compose();
+  paint();
 }
 
 let last = performance.now();
 let acc = 0;
 const step = 1000 / file.fps;
 function tick(now: number) {
+  const dt = Math.min(0.1, (now - last) / 1000);
   acc += now - last;
   last = now;
-  if (state.playing && acc >= step) {
-    state.frame += Math.floor(acc / step);
-    acc %= step;
-    draw();
-  } else if (!state.playing) acc = 0;
+  if (!state.playing) {
+    acc = 0;
+  } else {
+    let changed = false;
+    if (acc >= step) {
+      state.frame += Math.floor(acc / step);
+      acc %= step;
+      compose();
+      changed = true;
+    }
+    // Sprite berganti di fps bake; partikel rune diupdate tiap rAF supaya halus.
+    if (state.rune) state.rune.update(dt, grid.blade);
+    if (changed || state.rune) paint();
+  }
   requestAnimationFrame(tick);
 }
 draw();

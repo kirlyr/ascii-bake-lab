@@ -77,7 +77,13 @@ diperkirakan ±90–100 baris untuk badan penuh, lebar badan ±25–30 kolom. Uj
 1. Aset final non-chibi bertema medieval (kandidat: Quaternius Modular Character Outfits – Fantasy + Universal
    Animation Library, atau Mixamo). Lisensi wajib dicek.
 2. Tinggi final: ±90 baris dengan font kecil (±6–7px) supaya rapat seperti referensi.
-3. Optimasi format (biner + delta, shade level + part id sudah diputuskan) sebelum masuk portfolio.
+3. Optimasi format (biner + delta) sebelum masuk portfolio. Shade level + part id sudah diimplementasi (v2).
 4. Font final.
 5. Isi konten asli untuk semua placeholder.
 6. Domain.
+
+Update 2026-11-26 (format v2): bake sekarang menyimpan shade level (index glyph shape vector di ramp `.:-=+*#%@`) +
+part id + depth per sel, tanpa warna tekstur (gaya ansenjeo, disetujui user). Pedang KayKit dibagi `hilt`/`blade`
+di sumbu lokal, dengan socket blade (pangkal, ujung) per frame. Player punya 4 material blade dan demo rune api
+(partikel glyph + glow, mati saat reduced-motion). knight.json 86 KB gzip (dari 121 KB). Tuning partikel final ikut
+desain Tavern.

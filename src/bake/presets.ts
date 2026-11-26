@@ -16,9 +16,10 @@ export const PRESETS: Record<string, BakeParams> = {
     facing: 'left',
     clips: { idle: 'Idle', walk: 'Walk' },
     layers: {
-      body: { label: 'Badan', meshes: ['vanguard_Mesh'] },
-      helmet: { label: 'Visor', meshes: ['vanguard_visor'] },
+      body: { label: 'Badan', parts: { armor: ['vanguard_Mesh'] } },
+      helmet: { label: 'Visor', parts: { visor: ['vanguard_visor'] } },
     },
+    blade: undefined,
     hidden: [],
   },
 };
