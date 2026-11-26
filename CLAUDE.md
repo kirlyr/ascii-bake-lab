@@ -29,10 +29,12 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   Animation Library. Semua CC0, dari mirror GitHub. KayKit Knight (chibi) dan Soldier (Mixamo) sudah **dihapus,
   jangan dipakai lagi**. Mixamo tidak bisa diakses dari laptop user.
 - Format bake v2 (shade level + part id + depth, socket blade, material swap, rune api demo) selesai, lihat README.
+- PR #5: pedang digenggam (lengan kanan dikunci ke pose `Sword_Idle`), kulit tidak tembus rompi (outfit inflate +
+  bias compose armor), tuning warna, hero.json 170 KB gzip (dari 250 KB).
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
-1. Rapikan karakter: animasi yang menggenggam pedang, warna material, varian helm/senjata.
+1. Varian helm/senjata (2–3 per slot).
 2. Optimasi format output jika perlu (biner + delta).
 3. Buat repo portfolio, pindahkan bake tool, mulai dari intro + Character (Home).
 

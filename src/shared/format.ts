@@ -43,6 +43,11 @@ export interface FrameData {
 
 export interface LayerData {
   label: string;
+  /**
+   * Prioritas compose dalam unit depth: layer ini menang atas layer lain yang lebih dekat
+   * asal selisihnya ≤ bias. Untuk armor yang ditembus badan (mesh badan sedikit lebih besar dari outfit).
+   */
+  bias?: number;
   /** nama clip → frame berurutan (loop). */
   clips: Record<string, FrameData[]>;
 }
