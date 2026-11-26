@@ -14,9 +14,9 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   di Tavern; tanpa inventory grid/stats. Main quest: Pokecrut (tanpa aset Pokémon).
 - Palet: latar `#120e0a`, panel `#1b1510`, border `#4a3b2a`, teks `#ead9b5`, muted `#b0a083`, aksen `#d4a64a`,
   merah `#d8644c`, hijau `#8fae6a`. Animasi mati saat `prefers-reduced-motion`.
-- Karakter: bake per layer (badan/helm/armor/senjata/pet), tiap sel = char + depth + warna, compose runtime pilih
-  depth terdekat. Sel disimpan sebagai shade level + part id (bukan char final) agar material bisa di-swap di
-  runtime. Satu sudut kamera samping, arah sebaliknya = mirror. v1: 2–3 varian per slot.
+- Karakter: bake per layer (badan/helm/armor/senjata/pet), tiap sel = shade level + part id + depth (bukan char
+  final, supaya material bisa di-swap di runtime; prototype saat ini masih char final), compose runtime pilih
+  depth terdekat. Satu sudut kamera samping, arah sebaliknya = mirror. v1: 2–3 varian per slot.
 - Proporsi karakter **realistis, bukan chibi** (seperti referensi IG ansenjeo), tinggi ±90 baris, font kecil supaya rapat.
 - Three.js hanya di bake tool (dev). Build produksi tidak boleh membawa Three.js.
 - Kontak: form service (Formspree/Web3Forms). Hosting: VPS user + Caddy, deploy `dist` via GitHub Actions rsync.
