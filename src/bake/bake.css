@@ -1,0 +1,19 @@
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/700.css';
+:root { --bg:#120e0a; --panel:#1b1510; --border:#4a3b2a; --text:#ead9b5; --muted:#b0a083; --gold:#d4a64a; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 'JetBrains Mono', monospace; }
+header { padding:12px 16px; display:flex; gap:16px; align-items:baseline; border-bottom:1px solid var(--border); }
+h1 { margin:0; font-size:16px; color:var(--gold); }
+h2 { margin:0 0 8px; font-size:13px; color:var(--gold); }
+main { display:flex; gap:12px; padding:12px; align-items:flex-start; flex-wrap:wrap; }
+.panel { background:var(--panel); border:1px solid var(--border); padding:12px; }
+.muted { color:var(--muted); }
+form { display:grid; grid-template-columns:auto 120px; gap:4px 8px; }
+label { color:var(--muted); }
+input { background:var(--bg); color:var(--text); border:1px solid var(--border); font:inherit; padding:2px 4px; }
+.buttons { display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+button { background:var(--bg); color:var(--gold); border:1px solid var(--gold); font:inherit; padding:4px 8px; cursor:pointer; }
+button:disabled { opacity:.4; cursor:default; }
+canvas#three { background:#000; display:block; }
+canvas#preview { display:block; }
