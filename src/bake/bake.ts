@@ -62,7 +62,7 @@ export interface BakeParams {
   clips: Record<string, string>; // nama output → nama clip di glb
   layers: Record<string, LayerDef>;
   blade?: BladeSplit;
-  /** clip dari file terpisah (mis. animasi Mixamo "Without Skin"): nama clip → url. Clip pertama di file dipakai. */
+  /** clip dari file terpisah: nama clip → `url` (clip pertama) atau `url#NamaClip`. */
   animations?: Record<string, string>;
   attachments?: Attachment[];
   /** mesh yang selalu disembunyikan. */
@@ -219,9 +219,12 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
   });
 
   const animations = [...model.animations];
-  for (const [name, url] of Object.entries(p.animations ?? {})) {
-    const clip = (await loadAny(url)).animations[0];
-    if (!clip) throw new Error(`Tidak ada animasi di ${url}`);
+  for (const [name, ref] of Object.entries(p.animations ?? {})) {
+    // `url#NamaClip` memilih clip tertentu; tanpa `#` = clip pertama di file.
+    const [url, want] = ref.split('#');
+    const all = (await loadAny(url)).animations;
+    const clip = (want ? all.find((c) => c.name === want) : all[0])?.clone();
+    if (!clip) throw new Error(`Animasi ${ref} tidak ada`);
     clip.name = name;
     animations.push(clip);
   }
