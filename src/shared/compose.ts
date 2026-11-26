@@ -42,6 +42,23 @@ export function decodeSprite(file: BakeFile): Sprite {
   return { file, layers };
 }
 
+/** Layer tanpa slot selalu tampil. Per slot: varian yang dipasang (null = kosong). */
+export type Equipment = Record<string, string | null>;
+
+/** Equipment awal: layer pertama tiap slot. */
+export function defaultEquipment(file: BakeFile): Equipment {
+  const eq: Equipment = {};
+  for (const [k, l] of Object.entries(file.layers)) if (l.slot && !(l.slot in eq)) eq[l.slot] = k;
+  return eq;
+}
+
+/** Layer aktif untuk compose, urut sesuai file (urutan tidak memengaruhi hasil, depth yang menentukan). */
+export function activeLayers(file: BakeFile, eq: Equipment): string[] {
+  return Object.entries(file.layers)
+    .filter(([k, l]) => !l.slot || eq[l.slot] === k)
+    .map(([k]) => k);
+}
+
 export function createGrid(cols: number, rows: number): Grid {
   return { cols, rows, cell: new Uint8Array(cols * rows), depth: new Uint8Array(cols * rows), mirror: false, blade: null };
 }

@@ -31,10 +31,14 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Format bake v2 (shade level + part id + depth, socket blade, material swap, rune api demo) selesai, lihat README.
 - PR #5: pedang digenggam (lengan kanan dikunci ke pose `Sword_Idle`), kulit tidak tembus rompi (outfit inflate +
   bias compose armor), tuning warna, hero.json 170 KB gzip (dari 250 KB).
+- PR #6 equipment: varian per slot (3 helm, 4 senjata termasuk Gada, armor bisa dilepas), tiap varian = layer bake
+  dengan `slot`, UI pilih/lepas di player. Forge (material + rune) jalan di semua senjata.
+- Putar karakter (dipilih user 2026-11-26): **16 arah pose diam** (`hero-turn.json`, 64 KB gzip), arah samping tetap
+  beranimasi dari `hero.json`. Untuk Tavern; Home tetap sudut samping.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
-1. Varian helm/senjata (2–3 per slot).
+1. ~~Varian helm/senjata (2–3 per slot).~~ Selesai (PR equipment).
 2. Optimasi format output jika perlu (biner + delta).
 3. Buat repo portfolio, pindahkan bake tool, mulai dari intro + Character (Home).
 
