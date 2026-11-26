@@ -43,6 +43,7 @@ export const DEFAULT_LOOK: Record<string, MaterialKey> = {
   hilt: 'leather',
   blade: 'iron',
   shield: 'wood',
+  wood: 'wood',
   visor: 'visor',
   trim: 'brass',
 };

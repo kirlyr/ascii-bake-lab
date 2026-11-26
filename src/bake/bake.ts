@@ -77,6 +77,13 @@ export interface BakeParams {
   fps: number;
   /** derajat. 0 = kamera di depan model, -90 = samping (model hadap kanan). */
   yaw: number;
+  /**
+   * Bake beberapa arah sekaligus (derajat, menggantikan `yaw`). Framing dikunci bersama dan grid dipusatkan
+   * ke origin model. Arah sebaliknya dibuat player dengan mirror, jadi cukup 0..-180.
+   */
+  views?: number[];
+  /** true = hanya frame 0 tiap clip (pose diam, untuk putar karakter). */
+  still?: boolean;
   /** arah hadap model di hasil bake (tergantung orientasi model + yaw). */
   facing: 'left' | 'right';
   /** derajat, kamera sedikit dari atas. */
@@ -167,6 +174,7 @@ export const DEFAULT_PARAMS: BakeParams = {
     weapon('shortsword', `${Q}/ShortSword.glb`),
     // Sisi lebar Katana ada di sumbu lokal lain dari pedang Quaternius lainnya.
     weapon('katana', `${Q}/Katana.glb`, 90),
+    weapon('club', `${Q}/Club.glb`),
   ],
   layers: {
     body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes', 'Eyebrows'] } },
@@ -203,6 +211,14 @@ export const DEFAULT_PARAMS: BakeParams = {
       slot: 'weapon',
       parts: { blade: ['katana:Metal'], hilt: ['katana:Black', 'katana:Golden'] },
       blade: { mesh: 'katana:Metal', axis: 'z', at: 0.0046, below: 'hilt', above: 'blade' },
+    },
+    // Gada: kepala kayu tetap kayu, paku + cincin di kepala (mesh Black, z >= 0.012) ikut material forge,
+    // lilitan gagang (Black, z < 0.012) = hilt. Socket rune di sepanjang kepala.
+    club: {
+      label: 'Gada',
+      slot: 'weapon',
+      parts: { wood: ['club:Wood'], hilt: ['club:Black'] },
+      blade: { mesh: 'club:Black', axis: 'z', at: 0.012, below: 'hilt', above: 'blade' },
     },
   },
   // Mesh outfit yang tidak dipakai (lengan Ranger bertumpuk dengan lengan badan, hood diganti helm).
@@ -424,89 +440,121 @@ function poseAt(ctx: BakeContext, clipName: string, t: number) {
   return clip;
 }
 
-function frameCount(clip: THREE.AnimationClip, fps: number) {
-  return Math.max(1, Math.round(clip.duration * fps));
+function frameCount(clip: THREE.AnimationClip, p: BakeParams) {
+  return p.still ? 1 : Math.max(1, Math.round(clip.duration * p.fps));
 }
 
-/** Pasang kamera + lampu, framing tetap untuk semua frame semua clip. */
-function setupCamera(ctx: BakeContext, p: BakeParams, visible: Set<string>) {
-  const yaw = THREE.MathUtils.degToRad(p.yaw);
-  const pitch = THREE.MathUtils.degToRad(p.pitch);
-  const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
-  const cam = ctx.camera;
+const viewDir = (yawDeg: number, pitchDeg: number) => {
+  const yaw = THREE.MathUtils.degToRad(yawDeg);
+  const pitch = THREE.MathUtils.degToRad(pitchDeg);
+  return new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+};
+
+function aimCamera(cam: THREE.OrthographicCamera, dir: THREE.Vector3) {
   cam.position.copy(dir).multiplyScalar(20);
   cam.up.set(0, 1, 0);
   cam.lookAt(0, 0, 0);
   cam.updateMatrixWorld(true);
+}
 
+/** Framing bersama semua arah (ruang kamera; kamera selalu melihat origin dari jarak 20). */
+export interface Framing {
+  left: number;
+  right: number;
+  bottom: number;
+  top: number;
+  near: number;
+  far: number;
+  cols: number;
+}
+
+/**
+ * Ukur framing dari silhouette semua frame semua clip di semua arah, lalu kunci untuk seluruh bake.
+ * Satu arah: grid dipusatkan ke silhouette (paling rapat). Banyak arah: dipusatkan ke origin model,
+ * supaya karakter tidak bergeser saat diputar dan mirror tetap di poros yang sama.
+ */
+function measureFraming(ctx: BakeContext, p: BakeParams, visible: Set<string>, yaws: number[]): Framing {
+  const cam = ctx.camera;
   // Framing diukur dari hasil render (silhouette), bukan bounding box geometri:
-  // bounding box skinned mesh KayKit terlalu longgar. Pass 1: frustum lebar.
+  // bounding box skinned mesh terlalu longgar. Pass 1: frustum lebar.
   setVisible(ctx, visible);
   poseAt(ctx, Object.values(p.clips)[0], 0);
   const sphere = new THREE.Box3().setFromObject(ctx.root).getBoundingSphere(new THREE.Sphere());
   const R = sphere.radius * 2;
-  const c0 = sphere.center.clone().applyMatrix4(cam.matrixWorldInverse);
-  Object.assign(cam, { left: c0.x - R, right: c0.x + R, bottom: c0.y - R, top: c0.y + R, near: 0.01, far: 40 });
-  cam.updateProjectionMatrix();
-
   const M = 512;
   const rt = new THREE.WebGLRenderTarget(M, M);
-  const mat = makeDepthMaterial(cam.near, cam.far);
+  const mat = makeDepthMaterial(0.01, 40);
   const buf = new Uint8Array(M * M * 4);
-  let x0 = M, x1 = -1, y0 = M, y1 = -1, d0 = 255, d1 = 0;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, near = Infinity, far = -Infinity;
   const r = ctx.renderer;
   r.setClearColor(0x000000, 0);
   ctx.scene.overrideMaterial = mat;
-  for (const clipName of Object.values(p.clips)) {
-    const n = frameCount(poseAt(ctx, clipName, 0), p.fps);
-    for (let i = 0; i < n; i++) {
-      poseAt(ctx, clipName, i / p.fps);
-      r.setRenderTarget(rt);
-      r.clear();
-      r.render(ctx.scene, cam);
-      r.readRenderTargetPixels(rt, 0, 0, M, M, buf);
-      for (let y = 0; y < M; y++)
-        for (let x = 0; x < M; x++) {
-          const k = (y * M + x) * 4;
-          if (!buf[k + 3]) continue;
-          x0 = Math.min(x0, x); x1 = Math.max(x1, x);
-          y0 = Math.min(y0, y); y1 = Math.max(y1, y);
-          d0 = Math.min(d0, buf[k]); d1 = Math.max(d1, buf[k]);
-        }
+  for (const yaw of yaws) {
+    aimCamera(cam, viewDir(yaw, p.pitch));
+    const c0 = sphere.center.clone().applyMatrix4(cam.matrixWorldInverse);
+    Object.assign(cam, { left: c0.x - R, right: c0.x + R, bottom: c0.y - R, top: c0.y + R, near: 0.01, far: 40 });
+    cam.updateProjectionMatrix();
+    let x0 = M, x1 = -1, y0 = M, y1 = -1, d0 = 255, d1 = 0;
+    for (const clipName of Object.values(p.clips)) {
+      const n = frameCount(poseAt(ctx, clipName, 0), p);
+      for (let i = 0; i < n; i++) {
+        poseAt(ctx, clipName, i / p.fps);
+        r.setRenderTarget(rt);
+        r.clear();
+        r.render(ctx.scene, cam);
+        r.readRenderTargetPixels(rt, 0, 0, M, M, buf);
+        for (let y = 0; y < M; y++)
+          for (let x = 0; x < M; x++) {
+            const k = (y * M + x) * 4;
+            if (!buf[k + 3]) continue;
+            x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+            y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+            d0 = Math.min(d0, buf[k]); d1 = Math.max(d1, buf[k]);
+          }
+      }
     }
+    if (x1 < 0) throw new Error(`Model tidak terlihat oleh kamera (yaw ${yaw})`);
+    const px = (2 * R) / M;
+    minX = Math.min(minX, cam.left + x0 * px);
+    maxX = Math.max(maxX, cam.left + (x1 + 1) * px);
+    minY = Math.min(minY, cam.bottom + y0 * px);
+    maxY = Math.max(maxY, cam.bottom + (y1 + 1) * px);
+    near = Math.min(near, cam.near + (d0 / 255) * (cam.far - cam.near) - 0.05);
+    far = Math.max(far, cam.near + ((d1 + 1) / 255) * (cam.far - cam.near) + 0.05);
   }
   ctx.scene.overrideMaterial = null;
   r.setRenderTarget(null);
   rt.dispose();
   mat.dispose();
-  if (x1 < 0) throw new Error('Model tidak terlihat oleh kamera');
 
-  const px = (2 * R) / M;
-  const minX = cam.left + x0 * px, maxX = cam.left + (x1 + 1) * px;
-  const minY = cam.bottom + y0 * px, maxY = cam.bottom + (y1 + 1) * px;
-  const near = cam.near + (d0 / 255) * (cam.far - cam.near) - 0.05;
-  const far = cam.near + ((d1 + 1) / 255) * (cam.far - cam.near) + 0.05;
-
+  if (yaws.length > 1) {
+    const half = Math.max(-minX, maxX);
+    minX = -half;
+    maxX = half;
+  }
   // Tinggi model = rows (minus padding). cols = 0 berarti lebar grid otomatis
   // mengikuti lebar silhouette; kalau diisi, grid dipaksa ke ukuran itu.
   const cellH = (maxY - minY) / (p.rows - 2 * p.pad);
   const cellW = cellH * p.cellAspect;
-  const cols = p.cols > 0 ? p.cols : Math.ceil((maxX - minX) / cellW) + 2 * p.pad;
+  let cols = p.cols > 0 ? p.cols : Math.ceil((maxX - minX) / cellW) + 2 * p.pad;
+  if (yaws.length > 1 && cols % 2) cols++; // origin tepat di tengah grid, mirror tidak menggeser poros
   let w = maxX - minX + 2 * p.pad * cellW;
   let h = maxY - minY + 2 * p.pad * cellH;
   const gridAspect = (cols * p.cellAspect) / p.rows;
   if (w / h > gridAspect) h = w / gridAspect;
   else w = h * gridAspect;
-  const padH = p.pad * cellH;
   const cx = (minX + maxX) / 2;
   // Kaki menempel ke bawah grid supaya idle/walk sejajar.
-  const bottom = minY - padH;
-  cam.left = cx - w / 2;
-  cam.right = cx + w / 2;
-  cam.bottom = bottom;
-  cam.top = bottom + h;
-  cam.near = Math.max(0.01, near - 0.5);
-  cam.far = far + 0.5;
+  const bottom = minY - p.pad * cellH;
+  return { left: cx - w / 2, right: cx + w / 2, bottom, top: bottom + h, near: Math.max(0.01, near - 0.5), far: far + 0.5, cols };
+}
+
+/** Pasang kamera (framing terkunci) + lampu untuk satu arah. Lampu ikut kamera, jadi shading konsisten antar arah. */
+function setupView(ctx: BakeContext, p: BakeParams, fr: Framing, yaw: number) {
+  const dir = viewDir(yaw, p.pitch);
+  const cam = ctx.camera;
+  aimCamera(cam, dir);
+  Object.assign(cam, { left: fr.left, right: fr.right, bottom: fr.bottom, top: fr.top, near: fr.near, far: fr.far });
   cam.updateProjectionMatrix();
 
   // Lampu: key dari depan-atas (sisi kamera), fill lembut, rim dari belakang.
@@ -519,7 +567,6 @@ function setupCamera(ctx: BakeContext, p: BakeParams, visible: Set<string>) {
   const rim = new THREE.DirectionalLight(0xffd9a0, p.rimLight);
   rim.position.copy(dir).multiplyScalar(-10).add(new THREE.Vector3(0, 4, 0));
   ctx.scene.add(rim);
-  return { near, far, cols };
 }
 
 interface RawCells {
@@ -594,12 +641,15 @@ function sampleCells(
 
 export type Progress = (msg: string) => void;
 
-export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress = () => {}): Promise<BakeFile> {
+/** Satu BakeFile per arah (`views`, atau `[yaw]`). Semua arah berbagi framing, depth range, dan level. */
+export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress = () => {}): Promise<BakeFile[]> {
   const allLayerMeshes = new Set(Object.values(p.layers).flatMap(layerMeshes));
   for (const h of p.hidden) allLayerMeshes.delete(h);
-  const cam0 = setupCamera(ctx, p, allLayerMeshes);
-  const { near, far } = cam0;
-  p = { ...p, cols: cam0.cols };
+  const yaws = p.views?.length ? p.views : [p.yaw];
+  const framing = measureFraming(ctx, p, allLayerMeshes, yaws);
+  const { near, far } = framing;
+  p = { ...p, cols: framing.cols };
+  setupView(ctx, p, framing, yaws[0]);
   const cam = ctx.camera;
 
   const glyphs = await buildGlyphSet(p.charset, 'JetBrains Mono', p.cellAspect);
@@ -724,56 +774,65 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   lums.sort((a, b) => a - b);
   const levels = { lo: lums[Math.floor(lums.length * 0.02)] ?? 0, hi: lums[Math.floor(lums.length * 0.98)] ?? 1 };
 
-  const out: BakeFile = {
-    version: 2,
-    model: p.modelName,
-    cols: p.cols,
-    rows: p.rows,
-    cellAspect: p.cellAspect,
-    fps: p.fps,
-    facing: p.facing,
-    ramp: glyphs.chars.join(''),
-    parts,
-    layers: {},
-    bakedAt: new Date().toISOString(),
-    params: { ...p, modelUrl: undefined, layers: undefined },
-  };
+  const files: BakeFile[] = [];
+  for (const yaw of yaws) {
+    setupView(ctx, p, framing, yaw);
+    const [ox, oy] = project(new THREE.Vector3(0, 0, 0));
+    const out: BakeFile = {
+      version: 2,
+      yaw,
+      origin: [ox, oy],
+      model: p.modelName,
+      cols: p.cols,
+      rows: p.rows,
+      cellAspect: p.cellAspect,
+      fps: p.fps,
+      facing: p.facing,
+      ramp: glyphs.chars.join(''),
+      parts,
+      layers: {},
+      bakedAt: new Date().toISOString(),
+      params: { ...p, modelUrl: undefined, layers: undefined },
+    };
 
-  for (const [layerKey, layer] of Object.entries(p.layers)) {
-    const meshes = new Set(layerMeshes(layer));
-    out.layers[layerKey] = { label: layer.label, clips: {} };
-    if (layer.slot) out.layers[layerKey].slot = layer.slot;
-    if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
-    setVisible(ctx, meshes);
-    const blade = layer.blade && splits.has(layer.blade.mesh) ? bladeLocalOf(layer.blade) : null;
-    for (const [clipKey, clipName] of Object.entries(p.clips)) {
-      const clip = poseAt(ctx, clipName, 0);
-      const n = frameCount(clip, p.fps);
-      const frames: FrameData[] = (out.layers[layerKey].clips[clipKey] = []);
-      for (let f = 0; f < n; f++) {
-        poseAt(ctx, clipName, f / p.fps);
-        render();
-        const cells = sampleCells(p, colBuf, depBuf, idBuf, W, H, levels);
-        const shade = new Uint8Array(p.cols * p.rows);
-        const v = new Float32Array(DIMS);
-        for (let ci = 0; ci < shade.length; ci++) {
-          if (cells.coverage[ci] < p.minCoverage) {
-            cells.depth[ci] = EMPTY_DEPTH;
-            continue;
+    for (const [layerKey, layer] of Object.entries(p.layers)) {
+      const meshes = new Set(layerMeshes(layer));
+      out.layers[layerKey] = { label: layer.label, clips: {} };
+      if (layer.slot) out.layers[layerKey].slot = layer.slot;
+      if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
+      setVisible(ctx, meshes);
+      const blade = layer.blade && splits.has(layer.blade.mesh) ? bladeLocalOf(layer.blade) : null;
+      for (const [clipKey, clipName] of Object.entries(p.clips)) {
+        const clip = poseAt(ctx, clipName, 0);
+        const n = frameCount(clip, p);
+        const frames: FrameData[] = (out.layers[layerKey].clips[clipKey] = []);
+        for (let f = 0; f < n; f++) {
+          poseAt(ctx, clipName, f / p.fps);
+          render();
+          const cells = sampleCells(p, colBuf, depBuf, idBuf, W, H, levels);
+          const shade = new Uint8Array(p.cols * p.rows);
+          const v = new Float32Array(DIMS);
+          for (let ci = 0; ci < shade.length; ci++) {
+            if (cells.coverage[ci] < p.minCoverage) {
+              cells.depth[ci] = EMPTY_DEPTH;
+              continue;
+            }
+            let m = 0;
+            for (let d = 0; d < DIMS; d++) m = Math.max(m, cells.shape[ci * DIMS + d]);
+            for (let d = 0; d < DIMS; d++) v[d] = m > 0 ? Math.pow(cells.shape[ci * DIMS + d] / m, p.sharpness) * m : 0;
+            shade[ci] = match(v);
           }
-          let m = 0;
-          for (let d = 0; d < DIMS; d++) m = Math.max(m, cells.shape[ci * DIMS + d]);
-          for (let d = 0; d < DIMS; d++) v[d] = m > 0 ? Math.pow(cells.shape[ci * DIMS + d] / m, p.sharpness) * m : 0;
-          shade[ci] = match(v);
+          const frame = cropFrame(p, shade, cells);
+          if (blade) frame.blade = bladeSocket(blade);
+          frames.push(frame);
+          if (f === 0) onProgress(`${yaw}° ${layer.label} / ${clipKey}: ${n} frame`);
+          await new Promise((res) => setTimeout(res, 0));
         }
-        const frame = cropFrame(p, shade, cells);
-        if (blade) frame.blade = bladeSocket(blade);
-        frames.push(frame);
-        if (f === 0) onProgress(`${layer.label} / ${clipKey}: ${n} frame`);
-        await new Promise((res) => setTimeout(res, 0));
       }
     }
+    files.push(out);
   }
+  setupView(ctx, p, framing, yaws.includes(p.yaw) ? p.yaw : yaws[0]); // preview 3D di bake tool
   r.setClearColor(prevClear, prevAlpha);
   colorRT.dispose();
   depthRT.dispose();
@@ -781,7 +840,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   depthMat.dispose();
   for (const m of idMats.values()) m.dispose();
   for (const m of plainMats.values()) [m].flat().forEach((x) => x.dispose());
-  return out;
+  return files;
 }
 
 function cropFrame(p: BakeParams, shade: Uint8Array, cells: RawCells): FrameData {

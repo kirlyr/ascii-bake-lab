@@ -18,7 +18,7 @@ npm run dev
 - `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), equipment per slot,
   material blade (Iron/Steel/Gold/Bloodiron), rune api, mode warna Material/Part/Depth, penanda socket blade.
   Tahan ← / → untuk berjalan.
-- `npm run build` hanya mem-build player. Hasil saat ini: JS 10,3 KB (4,8 KB gzip), Three.js tidak ikut.
+- `npm run build` hanya mem-build player. Hasil saat ini: JS 11,5 KB (5,3 KB gzip), Three.js tidak ikut.
 
 ## Cara kerja bake
 
@@ -62,14 +62,28 @@ dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
 |---|---|---|
 | Armor | Rompi Ranger | cloth, leather, armor |
 | Helm | Helm Besi (`Helmet1`), Helm Ksatria (`Helmet2`), Helm Bangsawan (`Helmet3`) | helmet, trim (hiasan emas) |
-| Senjata | Pedang (`Sword`), Pedang Pendek (`ShortSword`), Katana | blade, hilt |
+| Senjata | Pedang (`Sword`), Pedang Pendek (`ShortSword`), Katana, Gada (`Club`) | blade, hilt, wood |
 
 ![varian equipment](docs/media/equipment.png)
 
 Kiri ke kanan: Helm Besi + Pedang (Iron), Helm Ksatria + Pedang Pendek (Steel), Helm Bangsawan + Katana (Gold),
-tanpa helm dan senjata. Di 90 baris, beda helm terutama terbaca dari silhouette (jambul Helm Bangsawan paling jelas).
-Belum dipakai: `Club` (tanpa blade, perlu keputusan apakah ikut material blade) dan `ShoulderPads` (Ranger sudah
-punya pauldron).
+Helm Besi + Gada (Bloodiron), tanpa helm dan senjata. Di 90 baris, beda helm terutama terbaca dari silhouette.
+
+Forge berlaku di semua senjata. Gada tidak punya bilah: kepala kayu tetap material kayu, **paku + cincin di kepala**
+jadi part `blade` (ikut material forge dan sumber socket rune), lilitan gagang = `hilt`. `ShoulderPads` belum dipakai
+(Ranger sudah punya pauldron).
+
+## Memutar karakter (16 arah, pose diam)
+
+Preset `hero-turn` (`/bake.html?model=hero-turn`) mem-bake frame 0 idle dari 9 arah (`views`: 0°, −22,5° … −180°),
+semua layer equipment, ke `public/baked/hero-turn.json` (`TurnFile`). 7 arah lainnya = mirror. Semua arah berbagi
+framing, rentang depth, dan auto-level; grid dipusatkan ke origin model supaya karakter tidak bergeser saat diputar.
+
+Player: drag karakter atau tombol ⟲ ⟳ (per 22,5°). Arah samping (±90°) memakai `hero.json` yang beranimasi
+(idle/walk); arah lain pose diam. Kedua file disejajarkan lewat `origin` (titik antara kaki, di grid) yang kini
+disimpan tiap BakeFile. Di portfolio, `hero-turn.json` cukup dimuat di Tavern.
+
+![16 arah, ditampilkan 8](docs/media/turn.png)
 
 ## Runtime
 
@@ -110,13 +124,14 @@ Perbaikan karakter (PR #5):
 
 ![sebelum dan sesudah](docs/media/hero-before-after.png)
 
-## Hasil saat ini (hero, 8 layer × 2 clip @12fps)
+## Hasil saat ini (hero, 10 layer × 2 clip @12fps)
 
 | | |
 |---|---|
-| Grid | 100 × 90 |
-| `hero.json` | 1,66 MB mentah / **183 KB gzip** (4 layer: 170 KB; tiap varian helm/senjata ±3–5 KB gzip) |
-| Player JS | 10,3 KB (4,8 KB gzip), tanpa Three.js |
+| Grid | 100 × 90 (`hero-turn`: 128 × 90, simetris di origin) |
+| `hero.json` | 1,70 MB mentah / **170 KB gzip** (10 layer; tiap varian helm/senjata ±3–6 KB gzip) |
+| `hero-turn.json` | 9 arah × 10 layer × 1 frame = **64 KB gzip** |
+| Player JS | 11,5 KB (5,3 KB gzip), tanpa Three.js |
 
 Ruang optimasi yang belum dikerjakan: format biner tanpa base64 (uji: ±130 KB gzip), delta antar frame, fps 8–10.
 

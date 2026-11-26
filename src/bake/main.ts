@@ -7,7 +7,7 @@ const modelKey = query.get('model') ?? 'hero';
 // `?o={...}` menimpa field preset sebelum model dimuat (dipakai untuk tuning posisi aksesori).
 const preset = PRESETS[modelKey] && { ...PRESETS[modelKey], ...JSON.parse(query.get('o') ?? '{}') };
 if (!preset) throw new Error(`Preset model "${modelKey}" tidak ada. Pilihan: ${Object.keys(PRESETS).join(', ')}`);
-import type { BakeFile } from '../shared/format';
+import type { BakeFile, TurnFile } from '../shared/format';
 import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment } from '../shared/compose';
 import { AsciiCanvas } from '../shared/ascii-canvas';
 import { lookFor } from '../shared/materials';
@@ -35,7 +35,8 @@ renderer.setPixelRatio(1);
 renderer.setSize(240, 360, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-let result: BakeFile | null = null;
+// Satu arah = BakeFile; banyak arah (`views`) = TurnFile.
+let result: BakeFile | TurnFile | null = null;
 const ctx = await loadModel(preset, renderer);
 $('save').textContent = `Simpan ke public/baked/${modelKey}.json`;
 status.textContent = `Model ${modelKey} siap. Clip: ${ctx.animations.length}, mesh: ${ctx.meshes.size}.`;
@@ -53,13 +54,15 @@ function showLayers(p: BakeParams, keys?: string[]) {
 async function run(p = readParams()) {
   $<HTMLButtonElement>('bake').disabled = true;
   const t0 = performance.now();
-  result = await bake(ctx, p, (msg) => (status.textContent = msg));
-  const sprite = decodeSprite(result);
-  const grid = createGrid(result.cols, result.rows);
-  composeFrame(sprite, grid, 'idle', 0, activeLayers(result, defaultEquipment(result)), false);
-  const ac = new AsciiCanvas(preview, result.cellAspect);
-  ac.setLook({ parts: result.parts, ramp: result.ramp, materials: lookFor(result.parts) });
-  ac.resize(result.cols, result.rows);
+  const files = await bake(ctx, p, (msg) => (status.textContent = msg));
+  result = p.views?.length ? { views: files } : files[0];
+  const first = files.find((f) => f.yaw === p.yaw) ?? files[0];
+  const sprite = decodeSprite(first);
+  const grid = createGrid(first.cols, first.rows);
+  composeFrame(sprite, grid, 'idle', 0, activeLayers(first, defaultEquipment(first)), false);
+  const ac = new AsciiCanvas(preview, first.cellAspect);
+  ac.setLook({ parts: first.parts, ramp: first.ramp, materials: lookFor(first.parts) });
+  ac.resize(first.cols, first.rows);
   ac.draw(grid, 'material', true);
   // Render 3D pose idle frame 0 dengan framing yang sama, sebagai pembanding.
   showLayers(p);
@@ -67,12 +70,12 @@ async function run(p = readParams()) {
   ctx.mixer.clipAction(ctx.animations.find((a) => a.name === p.clips.idle)!).reset().play();
   ctx.mixer.setTime(0);
   const h = 360;
-  renderer.setSize(Math.round((h * result.cols * result.cellAspect) / result.rows), h, false);
+  renderer.setSize(Math.round((h * first.cols * first.cellAspect) / first.rows), h, false);
   canvas.style.width = `${canvas.width}px`;
   canvas.style.height = `${h}px`;
   renderer.render(ctx.scene, ctx.camera);
   const json = JSON.stringify(result);
-  status.textContent = `Selesai ${((performance.now() - t0) / 1000).toFixed(1)} dtk · grid ${result.cols}×${result.rows} · ${(json.length / 1024).toFixed(1)} KB JSON`;
+  status.textContent = `Selesai ${((performance.now() - t0) / 1000).toFixed(1)} dtk · grid ${first.cols}×${first.rows} · ${files.length} arah · ${(json.length / 1024).toFixed(1)} KB JSON`;
   $<HTMLButtonElement>('bake').disabled = false;
   $<HTMLButtonElement>('save').disabled = false;
   $<HTMLButtonElement>('download').disabled = false;

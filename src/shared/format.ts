@@ -56,6 +56,10 @@ export interface LayerData {
 
 export interface BakeFile {
   version: 2;
+  /** arah kamera saat bake (derajat). -90 = samping, model hadap kanan; 0 = depan; ±180 = belakang. */
+  yaw?: number;
+  /** posisi origin model (titik antara kaki) di grid [x, y], sebelum mirror. Untuk menyejajarkan file/arah berbeda. */
+  origin?: [number, number];
   model: string;
   cols: number;
   rows: number;
@@ -93,3 +97,8 @@ for (const [a, b] of PAIRS) {
   MIRROR_MAP[b] = a;
 }
 export const mirrorChar = (c: string): string => MIRROR_MAP[c] ?? c;
+
+/** Hasil bake banyak arah (pose diam untuk memutar karakter). Arah lain = mirror dari salah satu view. */
+export interface TurnFile {
+  views: BakeFile[];
+}

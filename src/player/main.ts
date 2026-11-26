@@ -1,6 +1,6 @@
 // Player produksi: memutar JSON hasil bake sebagai teks di canvas. Tanpa Three.js.
-import type { BakeFile } from '../shared/format';
-import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment } from '../shared/compose';
+import type { BakeFile, TurnFile } from '../shared/format';
+import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment, type Sprite } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
 import { RUNES, RuneEmitter, type RuneKey } from '../shared/runes';
 import { BLADE_MATERIALS, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
@@ -12,20 +12,30 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as
 const info = $<HTMLElement>('#info');
 $<HTMLElement>('h1').textContent = `┤ ${MODEL.toUpperCase()} ├`;
 
-const res = await fetch(URL_JSON);
-const text = await res.text();
+// `<model>-turn.json` (opsional) = 16 arah pose diam untuk memutar karakter. Di portfolio cukup dimuat di Tavern.
+const [text, turnText] = await Promise.all([
+  fetch(URL_JSON).then((r) => r.text()),
+  fetch(URL_JSON.replace(/\.json$/, '-turn.json')).then((r) => (r.ok ? r.text() : null)),
+]);
 const file = JSON.parse(text) as BakeFile;
+const turn = turnText ? (JSON.parse(turnText) as TurnFile) : null;
 await document.fonts.load('700 10px "JetBrains Mono"');
 
 const sprite = decodeSprite(file);
-const grid = createGrid(file.cols, file.rows);
+// yaw view (0..-180) → sprite. Arah +yaw = mirror dari -yaw.
+const turnViews = new Map<number, Sprite>((turn?.views ?? []).map((v) => [v.yaw ?? 0, decodeSprite(v)]));
+// Grid cukup lebar untuk semua arah; tiap file disejajarkan lewat origin (titik antara kaki).
+const cols = Math.max(file.cols, ...(turn?.views ?? []).map((v) => v.cols));
+const grid = createGrid(cols, file.rows);
 const view = new AsciiCanvas($<HTMLCanvasElement>('#stage'), file.cellAspect);
-view.resize(file.cols, file.rows);
+view.resize(cols, file.rows);
+const SIDE = file.facing === 'right' ? -90 : 90;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const state = {
   clip: 'idle',
-  facing: file.facing as 'left' | 'right',
+  /** arah kamera (derajat, kelipatan 22,5). -90 = hadap kanan, 90 = hadap kiri, 0 = depan. */
+  yaw: SIDE,
   mode: 'material' as ColorMode,
   blade: 'iron' as MaterialKey,
   sockets: false,
@@ -84,7 +94,7 @@ const setClip = bindGroup('clip', (v) => {
   if (v !== state.clip) state.frame = 0;
   state.clip = v;
 });
-const setDir = bindGroup('dir', (v) => (state.facing = v as 'left' | 'right'));
+const setDir = bindGroup('dir', (v) => setYaw(v === file.facing ? SIDE : -SIDE));
 bindGroup('mode', (v) => (state.mode = v as ColorMode));
 bindGroup('rune', (v) => {
   // Partikel = animasi, jadi mati total saat reduced-motion.
@@ -117,11 +127,57 @@ addEventListener('keyup', (e) => {
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') setClip('idle');
 });
 
+// Putar: drag di canvas atau tombol ⟲ ⟳, per 22,5°. Animasi hanya di arah samping (hero.json);
+// arah lain = pose diam dari hero-turn.json.
+const norm = (y: number) => ((((y + 180) % 360) + 360) % 360) - 180;
+const isSide = () => Math.abs(state.yaw) === 90;
+const yawEl = $<HTMLElement>('#yaw');
+function setYaw(y: number) {
+  state.yaw = norm(y) === -180 ? 180 : norm(y);
+  if (!isSide() && state.clip !== 'idle') setClip('idle');
+  document.querySelectorAll<HTMLButtonElement>('[data-dir]').forEach((b) =>
+    b.setAttribute('aria-pressed', String(isSide() && (b.dataset.dir === file.facing) === (state.yaw === SIDE))),
+  );
+  yawEl.textContent = `${state.yaw}°`;
+  draw();
+}
+const STEP = 22.5;
+const rotate = (dir: number) => turn && setYaw(state.yaw + dir * STEP);
+$<HTMLButtonElement>('#rot-l').onclick = () => rotate(1);
+$<HTMLButtonElement>('#rot-r').onclick = () => rotate(-1);
+const stage = $<HTMLCanvasElement>('#stage');
+let dragX: number | null = null;
+stage.addEventListener('pointerdown', (e) => {
+  if (!turn) return;
+  dragX = e.clientX;
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', (e) => {
+  if (dragX === null) return;
+  const steps = Math.trunc((e.clientX - dragX) / 24);
+  if (!steps) return;
+  dragX += steps * 24;
+  rotate(-steps); // drag ke kanan = karakter berputar ke kanan (searah jarum jam dari atas)
+});
+stage.addEventListener('pointerup', () => (dragX = null));
+stage.addEventListener('pointercancel', () => (dragX = null));
+if (!turn) $<HTMLElement>('#turn').hidden = true;
+
 function paint() {
   view.draw(grid, state.mode, state.sockets);
   state.rune?.draw(view.ctx, grid, view.cellW, view.cellH, view.background);
 }
-const compose = () => composeFrame(sprite, grid, state.clip, state.frame, activeLayers(file, state.equip), state.facing !== file.facing);
+function compose() {
+  const mirror = state.yaw > 0 && state.yaw < 180;
+  const src = isSide() || !turn ? sprite : turnViews.get(mirror || state.yaw === 180 ? -state.yaw : state.yaw)!;
+  const f = src.file;
+  const [ox, oy] = f.origin ?? [f.cols / 2, f.rows];
+  const dx = Math.round(cols / 2 - (mirror ? f.cols - ox : ox));
+  const dy = Math.round((file.origin?.[1] ?? file.rows) - oy);
+  // View pose diam hanya punya frame 0 clip idle.
+  const [clip, frame] = src === sprite ? [state.clip, state.frame] : ['idle', 0];
+  composeFrame(src, grid, clip, frame, activeLayers(f, state.equip), mirror, dx, dy);
+}
 function draw() {
   compose();
   paint();
