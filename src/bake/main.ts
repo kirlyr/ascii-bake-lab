@@ -13,7 +13,7 @@ import { AsciiCanvas } from '../shared/ascii-canvas';
 import { lookFor } from '../shared/materials';
 
 // Parameter yang bisa diubah dari form. Sisanya (layer, clip, mesh) di presets.ts.
-const FIELDS: (keyof BakeParams)[] = ['cols', 'rows', 'fps', 'yaw', 'pitch', 'sub', 'minLight', 'gamma', 'sharpness', 'minCoverage', 'ambient', 'keyLight', 'rimLight'];
+const FIELDS: (keyof BakeParams)[] = ['cols', 'rows', 'fps', 'yaw', 'pitch', 'sub', 'albedo', 'minLight', 'gamma', 'sharpness', 'minCoverage', 'ambient', 'keyLight', 'rimLight'];
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const form = $<HTMLFormElement>('params');
@@ -87,3 +87,13 @@ $('save').onclick = async () => {
 // Daftar nama mesh (termasuk aksesori `<name>:<material>`) untuk mengisi preset.
 (window as unknown as Record<string, unknown>).__meshes = [...ctx.meshes.keys()];
 (window as unknown as Record<string, unknown>).__bake = (o: Partial<BakeParams> = {}) => run({ ...readParams(), ...o });
+// Inspeksi 3D (setelah bake, framing sama): window.__view('walk', 0.5) → dataURL render pose itu.
+(window as unknown as Record<string, unknown>).__view = (clip: string, t: number) => {
+  const p = readParams();
+  for (const [name, m] of ctx.meshes) m.visible = !p.hidden.includes(name);
+  ctx.mixer.stopAllAction();
+  ctx.mixer.clipAction(ctx.animations.find((a) => a.name === (p.clips[clip] ?? clip))!).reset().play();
+  ctx.mixer.setTime(t);
+  renderer.render(ctx.scene, ctx.camera);
+  return canvas.toDataURL();
+};

@@ -8,6 +8,8 @@ import { buildGlyphSet, makeMatcher, DIMS, REG_X, REG_Y } from './glyphs';
 
 export interface LayerDef {
   label: string;
+  /** meter. Layer ini menang atas layer yang lebih dekat ≤ jarak ini (lihat LayerData.bias). */
+  bias?: number;
   /** part → mesh. Part menentukan material di runtime (lihat src/shared/materials.ts). */
   parts: Record<string, string[]>;
 }
@@ -41,6 +43,17 @@ export interface Attachment {
   scale: number;
 }
 
+export interface PoseOverlay {
+  /** `url#NamaClip` sumber pose. */
+  from: string;
+  /** detik di clip sumber yang diambil. */
+  at: number;
+  /** nama tulang yang ditimpa (dibandingkan tanpa non-alfanumerik). */
+  bones: string[];
+  /** rotasi tambahan per tulang (derajat XYZ, ruang lokal), dikalikan setelah pose sumber. */
+  adjust?: Record<string, [number, number, number]>;
+}
+
 const layerMeshes = (l: LayerDef) => Object.values(l.parts).flat();
 
 export interface BakeParams {
@@ -64,16 +77,31 @@ export interface BakeParams {
   blade?: BladeSplit;
   /** clip dari file terpisah: nama clip → `url` (clip pertama) atau `url#NamaClip`. */
   animations?: Record<string, string>;
+  /**
+   * Timpa rotasi tulang tertentu di clip dengan pose diam dari clip lain (mis. lengan kanan dari `Sword_Idle`),
+   * supaya tangan menggenggam senjata tanpa ikut ayunan. Kunci = nama clip (setelah `animations`).
+   */
+  overlays?: Record<string, PoseOverlay>;
   attachments?: Attachment[];
   /**
    * Outfit skinned dengan rig yang sama (mis. Quaternius Modular Outfits di atas Universal Base Characters).
    * Mesh-nya di-bind ulang ke skeleton model utama, jadi ikut animasi yang sama.
    */
   outfits?: string[];
+  /**
+   * meter. Outfit digelembungkan sepanjang normal sebelum skinning, supaya badan yang lebih besar
+   * (Superhero vs tubuh Regular untuk outfit Ranger) tidak menembus.
+   */
+  outfitInflate?: number;
   /** mesh yang selalu disembunyikan. */
   hidden: string[];
   /** ramp gelap → terang. Index glyph hasil shape matching = shade level. */
   charset: string;
+  /**
+   * 0..1. Porsi warna tekstur di shade level. 0 = hanya pencahayaan (albedo putih), 1 = tekstur penuh.
+   * Tekstur gelap (celana hijau tua, kulit samak) membuat glyph terlalu jarang; warna part datang dari material.
+   */
+  albedo: number;
   /** kecerahan minimum area tertutup (0..1), supaya bagian gelap tetap rapat. */
   minLight: number;
   gamma: number;
@@ -85,12 +113,20 @@ export interface BakeParams {
   ambient: number;
   keyLight: number;
   rimLight: number;
+  /**
+   * Kuantisasi depth (unit 0..254). 4 ≈ 1,8 cm untuk hero: cukup untuk compose, dan gzip hero.json
+   * turun ±30% karena noise depth 8-bit hilang.
+   */
+  depthStep: number;
   /** padding grid di sekitar bounding box, dalam sel. */
   pad: number;
 }
 
 const Q = '/assets/models/quaternius';
 const UBC = '/assets/models/quaternius-ubc';
+const UAL = `${UBC}/UAL_subset.glb`;
+const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'].flatMap((f) => [1, 2, 3].map((i) => `${f}_0${i}_r`));
+const SWORD_ARM: PoseOverlay = { from: `${UAL}#Sword_Idle`, at: 0, bones: ['clavicle_r', 'upperarm_r', 'lowerarm_r', 'hand_r', ...FINGERS] };
 
 // Karakter utama: badan Quaternius Universal Base Characters (Superhero_Male, proporsi realistis),
 // armor = outfit Ranger (rig sama), helm + pedang dari Quaternius Animated Knight Pack. Semua CC0.
@@ -106,18 +142,24 @@ export const DEFAULT_PARAMS: BakeParams = {
   yaw: -90,
   facing: 'right',
   pitch: 8,
-  animations: { idle: `${UBC}/UAL_idle_walk.glb#Idle_Loop`, walk: `${UBC}/UAL_idle_walk.glb#Walk_Loop` },
+  animations: { idle: `${UAL}#Idle_Loop`, walk: `${UAL}#Walk_Loop` },
+  // Animasi idle/walk gratis tidak menggenggam senjata: lengan kanan + jari dikunci ke pose `Sword_Idle`
+  // (kepalan), jadi pedang tetap di tangan dan tidak terayun ke belakang saat walk.
+  overlays: { idle: SWORD_ARM, walk: SWORD_ARM },
   clips: { idle: 'idle', walk: 'walk' },
   outfits: ['/assets/models/quaternius-outfits/Male_Ranger.gltf'],
+  outfitInflate: 0.02,
   attachments: [
     { name: 'helmet', url: `${Q}/Helmet1.glb`, bone: 'Head', position: [0, 0.1, 0.02], rotation: [0, 0, 0], scale: 0.14 },
-    // Rotasi 45° di sumbu X tulang tangan = blade condong ke depan-bawah saat lengan turun.
-    { name: 'sword', url: `${Q}/Sword.glb`, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [45, 0, 0], scale: 0.22 },
+    // Dengan pose kepalan Sword_Idle: blade turun ke depan, sisi lebar menghadap kamera (Z 90°).
+    { name: 'sword', url: `${Q}/Sword.glb`, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [25, 0, 90], scale: 0.22 },
   ],
   layers: {
     body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes', 'Eyebrows'] } },
     armor: {
       label: 'Armor',
+      // Badan Superhero lebih besar dari tubuh untuk outfit Ranger: kulit menembus rompi beberapa cm.
+      bias: 0.04,
       parts: {
         cloth: ['Male_Ranger_Body', 'Male_Ranger_Legs'],
         leather: ['Male_Ranger_Body_Belt_1', 'Male_Ranger_Body_Belt_2', 'Male_Ranger_Feet_Boots', 'Male_Ranger_Arms_Bracer'],
@@ -134,13 +176,15 @@ export const DEFAULT_PARAMS: BakeParams = {
   // Ramp density gelap → terang. Shape vector tetap memilih di antara glyph ini,
   // jadi tepi tetap mengikuti silhouette. Charset penuh terlalu ramai (lihat README).
   charset: '.:-=+*#%@',
+  albedo: 0.5,
   minLight: 0.22,
-  gamma: 1.1,
+  gamma: 1.8,
   sharpness: 2.0,
   minCoverage: 0.12,
   ambient: 0.5,
   keyLight: 3.5,
   rimLight: 1.2,
+  depthStep: 4,
   pad: 1,
 };
 
@@ -257,6 +301,14 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
       const bindMatrix = m.bindMatrix.clone();
       root.attach(m);
       m.bind(new THREE.Skeleton(bones, m.skeleton.boneInverses), bindMatrix);
+      if (p.outfitInflate) {
+        const g = (m.geometry = m.geometry.clone());
+        const pos = g.attributes.position, nor = g.attributes.normal;
+        // Inflate dalam meter dunia: bagi skala mesh supaya tidak tergantung unit file (cm vs m).
+        m.updateMatrixWorld(true);
+        const k = p.outfitInflate / m.matrixWorld.getMaxScaleOnAxis();
+        for (let i = 0; i < pos.count; i++) pos.setXYZ(i, pos.getX(i) + nor.getX(i) * k, pos.getY(i) + nor.getY(i) * k, pos.getZ(i) + nor.getZ(i) * k);
+      }
       meshes.set(m.name, m);
     }
   }
@@ -270,6 +322,23 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     if (!clip) throw new Error(`Animasi ${ref} tidak ada`);
     clip.name = name;
     animations.push(clip);
+  }
+  for (const [name, o] of Object.entries(p.overlays ?? {})) {
+    const clip = animations.find((c) => c.name === name);
+    if (!clip) throw new Error(`Overlay: clip "${name}" tidak ada`);
+    const [url, want] = o.from.split('#');
+    const src = (await loadAny(url)).animations.find((c) => c.name === want);
+    if (!src) throw new Error(`Overlay: clip ${o.from} tidak ada`);
+    const bones = new Set(o.bones.map(norm));
+    const adjust = new Map(Object.entries(o.adjust ?? {}).map(([b, r]) => [norm(b), r]));
+    const isTarget = (t: THREE.KeyframeTrack) => t.name.endsWith('.quaternion') && bones.has(norm(t.name.slice(0, -11)));
+    clip.tracks = clip.tracks.filter((t) => !isTarget(t));
+    for (const t of src.tracks.filter(isTarget)) {
+      const q = new THREE.Quaternion().fromArray(new THREE.QuaternionLinearInterpolant(t.times, t.values, 4, new Float32Array(4)).evaluate(o.at));
+      const r = adjust.get(norm(t.name.slice(0, -11)));
+      if (r) q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...(r.map(THREE.MathUtils.degToRad) as [number, number, number]))));
+      clip.tracks.push(new THREE.QuaternionKeyframeTrack(t.name, [0], q.toArray()));
+    }
   }
 
   for (const a of p.attachments ?? []) {
@@ -481,7 +550,7 @@ function sampleCells(
         let best = 1;
         for (let k = 2; k <= MAX_PARTS; k++) if (votes[k] > votes[best]) best = k;
         part[ci] = best - 1;
-        depth[ci] = Math.min(254, dmin);
+        depth[ci] = Math.min(254, Math.round(dmin / p.depthStep) * p.depthStep);
       }
     }
   }
@@ -560,6 +629,20 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   const prevAlpha = r.getClearAlpha();
   r.setClearColor(0x000000, 0);
   const colBuf = new Uint8Array(W * H * 4);
+  const plainBuf = new Uint8Array(W * H * 4);
+  // Varian material tanpa tekstur warna (albedo putih) untuk pass pencahayaan murni.
+  const plainMats = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+  const toPlain = (m: THREE.Material) => {
+    const c = m.clone() as THREE.MeshStandardMaterial;
+    c.map = null;
+    c.color?.set(0xffffff);
+    return c;
+  };
+  if (p.albedo < 1)
+    for (const m of ctx.meshes.values()) {
+      const mesh = m as THREE.Mesh;
+      plainMats.set(mesh, Array.isArray(mesh.material) ? mesh.material.map(toPlain) : toPlain(mesh.material));
+    }
   const depBuf = new Uint8Array(W * H * 4);
   const idBuf = new Uint8Array(W * H * 4);
 
@@ -572,6 +655,16 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   const render = () => {
     ctx.scene.overrideMaterial = null;
     pass(colorRT, colBuf);
+    if (plainMats.size) {
+      const orig = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+      for (const [mesh, mat] of plainMats) {
+        orig.set(mesh, mesh.material);
+        mesh.material = mat;
+      }
+      pass(colorRT, plainBuf);
+      for (const [mesh, mat] of orig) mesh.material = mat;
+      for (let i = 0; i < colBuf.length; i++) if ((i & 3) !== 3) colBuf[i] = plainBuf[i] + (colBuf[i] - plainBuf[i]) * p.albedo;
+    }
     ctx.scene.overrideMaterial = depthMat;
     pass(depthRT, depBuf);
     ctx.scene.overrideMaterial = null;
@@ -613,6 +706,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   for (const [layerKey, layer] of Object.entries(p.layers)) {
     const meshes = new Set(layerMeshes(layer));
     out.layers[layerKey] = { label: layer.label, clips: {} };
+    if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
     setVisible(ctx, meshes);
     const withBlade = !!split && meshes.has(split.mesh);
     for (const [clipKey, clipName] of Object.entries(p.clips)) {
@@ -649,6 +743,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   idRT.dispose();
   depthMat.dispose();
   for (const m of idMats.values()) m.dispose();
+  for (const m of plainMats.values()) [m].flat().forEach((x) => x.dispose());
   return out;
 }
 

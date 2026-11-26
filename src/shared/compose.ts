@@ -1,4 +1,4 @@
-// Runtime compose: tumpuk beberapa layer per sel berdasarkan depth terdekat.
+// Runtime compose: tumpuk beberapa layer per sel berdasarkan depth terdekat (dikurangi bias layer).
 // Tanpa Three.js. Dipakai player dan preview di bake tool.
 import { b64decode, EMPTY_DEPTH, type BakeFile, type BladeSocket } from './format';
 
@@ -56,6 +56,7 @@ export function composeFrame(sprite: Sprite, grid: Grid, clip: string, frame: nu
     const frames = sprite.layers[lk]?.[clip];
     if (!frames?.length) continue;
     const f = frames[frame % frames.length];
+    const bias = sprite.file.layers[lk].bias ?? 0;
     if (f.blade) {
       const m = ([x, y, d]: number[]): [number, number, number] => [(mirror ? cols - x : x) + offsetX, y + offsetY, d];
       grid.blade = { base: m(f.blade.base), tip: m(f.blade.tip) };
@@ -65,8 +66,8 @@ export function composeFrame(sprite: Sprite, grid: Grid, clip: string, frame: nu
       if (gy < 0 || gy >= grid.rows) continue;
       for (let x = 0; x < f.w; x++) {
         const i = y * f.w + x;
-        const d = f.depth[i];
-        if (d === EMPTY_DEPTH) continue;
+        if (f.depth[i] === EMPTY_DEPTH) continue;
+        const d = Math.max(0, f.depth[i] - bias);
         const sx = f.x + x;
         const gx = (mirror ? cols - 1 - sx : sx) + offsetX;
         if (gx < 0 || gx >= grid.cols) continue;

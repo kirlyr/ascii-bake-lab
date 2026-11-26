@@ -14,14 +14,15 @@ export interface Material {
 }
 
 export const MATERIALS = {
-  skin: { label: 'Kulit', colors: ['#5a3a26', '#e6b98f'] },
-  plate: { label: 'Pelat', colors: ['#3a342c', '#8a8070', '#e4dccb'] },
-  cloth: { label: 'Kain', colors: ['#4a1812', '#d8644c'] },
-  leather: { label: 'Kulit samak', colors: ['#3a2818', '#b08a5c'] },
-  wood: { label: 'Kayu', colors: ['#3a2716', '#c0925a'] },
-  visor: { label: 'Visor', colors: ['#1d2a1c', '#8fae6a'] },
+  // Stop pertama tidak terlalu gelap supaya glyph tepi (`.:`) tetap terbaca di latar #120e0a.
+  skin: { label: 'Kulit', colors: ['#6a4430', '#c48a5e', '#f2cfa4'] },
+  plate: { label: 'Pelat', colors: ['#4a4238', '#9a8f7c', '#ead9b5'] },
+  cloth: { label: 'Kain lumut', colors: ['#34402a', '#6f8a4c', '#b4cc8a'] },
+  leather: { label: 'Kulit samak', colors: ['#4e3220', '#946038', '#d8a870'] },
+  wood: { label: 'Kayu', colors: ['#4a3420', '#8a6038', '#c89a60'] },
+  visor: { label: 'Visor', colors: ['#2a3a26', '#8fae6a'] },
   // Material blade (Forge). Pasangan glyph mengikuti reel ansenjeo.
-  iron: { label: 'Iron #%', glyphs: '.:-=+##%%', colors: ['#3c3c40', '#8c8c90', '#d0d0d0'] },
+  iron: { label: 'Iron #%', glyphs: '.:-=+##%%', colors: ['#4a4a4e', '#9c9ca0', '#e0e0dc'] },
   steel: { label: 'Steel @%', glyphs: '.:-=+@@%%', colors: ['#34404c', '#90a4b8', '#eef4fa'] },
   gold: { label: 'Gold 0o', glyphs: '.:-=+00oo', colors: ['#5a3e10', '#d4a64a', '#f6dc8c'] },
   bloodiron: { label: 'Bloodiron B8', glyphs: '.:-=+BB88', colors: ['#3a0e0c', '#a83a2a', '#f08a6c'] },
