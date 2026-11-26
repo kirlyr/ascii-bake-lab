@@ -1,0 +1,19 @@
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/700.css';
+:root { --bg:#120e0a; --panel:#1b1510; --border:#4a3b2a; --text:#ead9b5; --muted:#b0a083; --gold:#d4a64a; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:13px/1.5 'JetBrains Mono', monospace; }
+main { display:flex; gap:16px; padding:16px; align-items:flex-start; flex-wrap:wrap; }
+.panel { background:var(--panel); border:1px solid var(--border); padding:12px 16px; }
+h1, h2 { margin:0 0 8px; font-size:13px; color:var(--gold); font-weight:700; }
+h2 { margin-top:14px; }
+canvas { display:block; }
+.controls { width:240px; }
+.row { display:flex; gap:6px; flex-wrap:wrap; }
+.col { display:flex; flex-direction:column; gap:4px; }
+.muted { color:var(--muted); }
+button { background:var(--bg); color:var(--muted); border:1px solid var(--border); font:inherit; padding:3px 8px; cursor:pointer; }
+button[aria-pressed="true"] { color:var(--gold); border-color:var(--gold); }
+button:focus-visible, input:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+label { display:flex; gap:6px; align-items:center; cursor:pointer; }
+input[type="checkbox"] { accent-color: var(--gold); }

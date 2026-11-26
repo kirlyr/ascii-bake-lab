@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bake Tool (dev)</title>
+  <link rel="stylesheet" href="/src/bake/bake.css" />
+</head>
+<body>
+  <header><h1>┤ BAKE TOOL ├</h1><span class="muted">dev only · Three.js tidak ikut ke build produksi</span></header>
+  <main>
+    <section class="panel">
+      <h2>Parameter</h2>
+      <form id="params"></form>
+      <div class="buttons">
+        <button id="bake" type="button">Bake</button>
+        <button id="save" type="button" disabled>Simpan</button>
+        <button id="download" type="button" disabled>Download JSON</button>
+      </div>
+      <p id="status" class="muted">Memuat model…</p>
+    </section>
+    <section class="panel">
+      <h2>Render 3D</h2>
+      <canvas id="three"></canvas>
+    </section>
+    <section class="panel">
+      <h2>Preview ASCII (idle, frame 0, semua layer)</h2>
+      <canvas id="preview"></canvas>
+    </section>
+  </main>
+  <script type="module" src="/src/bake/main.ts"></script>
+</body>
+</html>

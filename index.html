@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASCII Player</title>
+  <link rel="stylesheet" href="/src/player/player.css" />
+</head>
+<body>
+  <main>
+    <section class="panel stage-panel">
+      <h1>┤ KNIGHT ├</h1>
+      <canvas id="stage" aria-label="Karakter ASCII animasi"></canvas>
+    </section>
+    <section class="panel controls">
+      <h2>Animasi</h2>
+      <div class="row" role="group" aria-label="Clip">
+        <button data-clip="idle" aria-pressed="true">Idle</button>
+        <button data-clip="walk" aria-pressed="false">Walk</button>
+      </div>
+      <h2>Arah</h2>
+      <div class="row" role="group" aria-label="Arah">
+        <button data-dir="left" aria-pressed="false">← Kiri</button>
+        <button data-dir="right" aria-pressed="true">Kanan →</button>
+      </div>
+      <h2>Layer</h2>
+      <div id="layers" class="col"></div>
+      <h2>Warna</h2>
+      <div class="row" role="group" aria-label="Warna">
+        <button data-mode="texture" aria-pressed="true">Tekstur</button>
+        <button data-mode="medieval" aria-pressed="false">Medieval</button>
+        <button data-mode="depth" aria-pressed="false">Depth</button>
+      </div>
+      <div class="row"><button id="play" aria-pressed="true">Pause</button></div>
+      <p class="muted">Tahan ← / → untuk berjalan.</p>
+      <p id="info" class="muted"></p>
+    </section>
+  </main>
+  <script type="module" src="/src/player/main.ts"></script>
+</body>
+</html>
