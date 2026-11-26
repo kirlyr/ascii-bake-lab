@@ -50,7 +50,7 @@ Mockup visual (claude.ai artifact): https://claude.ai/artifact/QuDeZgYmb947G6Hgd
   - **Format sel (keputusan 2026-11-26):** simpan **shade level + part id** per sel, bukan char final. Runtime
     memetakan shade ke charset + palet material, jadi ganti material tidak perlu re-bake. Senjata juga menyimpan
     titik socket blade (pangkal, ujung) per frame untuk emitter partikel rune.
-  - Sumber aset: KayKit Adventurers (CC0, sudah dipakai), Quaternius, Mixamo. Lisensi tiap aset wajib dicek.
+  - Sumber aset: Quaternius (CC0). KayKit (chibi) dan Mixamo tidak dipakai lagi.
 - **Kontak:** form service (Formspree atau Web3Forms), email sebagai fallback.
 - **Hosting:** VPS milik user dengan Caddy, deploy `dist` via GitHub Actions + rsync, hardening dasar.
   Domain belum ada (akan sewa). Keputusan ini menggantikan rencana awal GitHub Pages.
@@ -74,8 +74,9 @@ diperkirakan ±90–100 baris untuk badan penuh, lebar badan ±25–30 kolom. Uj
 90 baris sudah ada di repo (`?model=soldier`), 176 KB gzip untuk 2 layer.
 
 ## Masih terbuka
-1. Aset final non-chibi bertema medieval (kandidat: Quaternius Modular Character Outfits – Fantasy + Universal
-   Animation Library, atau Mixamo). Lisensi wajib dicek.
+1. ~~Aset final~~ Diputuskan 2026-11-26: Quaternius Universal Base Characters (Superhero_Male) + outfit Ranger +
+   helm/pedang Knight Pack + Universal Animation Library, semua CC0 (lihat README bagian Karakter). Sisa: animasi
+   yang menggenggam senjata, varian armor (versi gratis hanya Ranger/Peasant).
 2. Tinggi final: ±90 baris dengan font kecil (±6–7px) supaya rapat seperti referensi.
 3. Optimasi format (biner + delta) sebelum masuk portfolio. Shade level + part id sudah diimplementasi (v2).
 4. Font final.

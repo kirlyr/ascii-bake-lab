@@ -23,15 +23,16 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   Domain belum ada.
 
 ## Status (2026-11-26)
-- Prototype bake tool + player selesai di repo ini (KayKit Knight CC0, idle + walk, 4 layer, mirror). Lihat README
-  untuk hasil dan ukuran file.
-- Uji proporsi realistis: preset `soldier` (Mixamo, glb tidak di-commit), 90 baris. KayKit Knight (chibi) hanya
-  dipakai untuk membuktikan pipeline.
+- Prototype bake tool + player selesai di repo ini (idle + walk, 4 layer, mirror). Lihat README untuk hasil.
+- **Karakter final (dipilih user 2026-11-26):** badan Quaternius Universal Base Characters `Superhero_Male`
+  (proporsi realistis, 90 baris) + armor outfit Ranger + helm/pedang Quaternius Knight Pack, animasi Universal
+  Animation Library. Semua CC0, dari mirror GitHub. KayKit Knight (chibi) dan Soldier (Mixamo) sudah **dihapus,
+  jangan dipakai lagi**. Mixamo tidak bisa diakses dari laptop user.
 - Format bake v2 (shade level + part id + depth, socket blade, material swap, rune api demo) selesai, lihat README.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
-1. Pilih aset final non-chibi bertema medieval + cek lisensinya (lihat "Masih terbuka" di `docs/PLAN.md`).
+1. Rapikan karakter: animasi yang menggenggam pedang, warna material, varian helm/senjata.
 2. Optimasi format output jika perlu (biner + delta).
 3. Buat repo portfolio, pindahkan bake tool, mulai dari intro + Character (Home).
 

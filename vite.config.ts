@@ -8,7 +8,7 @@ const bakeSave = (): Plugin => ({
   apply: 'serve',
   configureServer(server) {
     server.middlewares.use('/__bake/save', (req, res) => {
-      const name = new URL(req.url ?? '', 'http://x').searchParams.get('name') ?? 'knight';
+      const name = new URL(req.url ?? '', 'http://x').searchParams.get('name') ?? 'hero';
       if (req.method !== 'POST' || !/^[a-z0-9-]+$/.test(name)) {
         res.statusCode = 400;
         return res.end();

@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import { bake, loadModel, type BakeParams } from './bake';
 import { PRESETS } from './presets';
 
-const modelKey = new URLSearchParams(location.search).get('model') ?? 'knight';
-const preset = PRESETS[modelKey];
+const query = new URLSearchParams(location.search);
+const modelKey = query.get('model') ?? 'hero';
+// `?o={...}` menimpa field preset sebelum model dimuat (dipakai untuk tuning posisi aksesori).
+const preset = PRESETS[modelKey] && { ...PRESETS[modelKey], ...JSON.parse(query.get('o') ?? '{}') };
 if (!preset) throw new Error(`Preset model "${modelKey}" tidak ada. Pilihan: ${Object.keys(PRESETS).join(', ')}`);
 import type { BakeFile } from '../shared/format';
 import { composeFrame, createGrid, decodeSprite } from '../shared/compose';
@@ -34,7 +36,7 @@ renderer.setSize(240, 360, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 let result: BakeFile | null = null;
-const ctx = await loadModel(preset.modelUrl, renderer);
+const ctx = await loadModel(preset, renderer);
 $('save').textContent = `Simpan ke public/baked/${modelKey}.json`;
 status.textContent = `Model ${modelKey} siap. Clip: ${ctx.animations.length}, mesh: ${ctx.meshes.size}.`;
 
@@ -82,4 +84,6 @@ $('save').onclick = async () => {
 };
 
 // Untuk bake headless (Playwright): window.__bake(overrides) → BakeFile
+// Daftar nama mesh (termasuk aksesori `<name>:<material>`) untuk mengisi preset.
+(window as unknown as Record<string, unknown>).__meshes = [...ctx.meshes.keys()];
 (window as unknown as Record<string, unknown>).__bake = (o: Partial<BakeParams> = {}) => run({ ...readParams(), ...o });

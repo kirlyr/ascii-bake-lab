@@ -2,6 +2,7 @@
 // Three.js hanya dipakai di sini (dev). Output = BakeFile JSON v2.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { b64encode, EMPTY_DEPTH, MAX_PARTS, MAX_SHADES, packCell, type BakeFile, type BladeSocket, type FrameData, type SocketPoint } from '../shared/format';
 import { buildGlyphSet, makeMatcher, DIMS, REG_X, REG_Y } from './glyphs';
 
@@ -25,6 +26,21 @@ export interface BladeSplit {
   above: string;
 }
 
+/**
+ * Aksesori (helm, pedang, dll.) dari file terpisah yang dipasang ke tulang model saat bake.
+ * Mesh-nya terdaftar sebagai `<name>:<nama material>`, jadi part bisa dipetakan per material.
+ */
+export interface Attachment {
+  name: string;
+  url: string;
+  /** nama tulang, tanpa ':' (mis. `mixamorigHead`). */
+  bone: string;
+  /** offset di ruang tulang. rotation dalam derajat (XYZ). */
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: number;
+}
+
 const layerMeshes = (l: LayerDef) => Object.values(l.parts).flat();
 
 export interface BakeParams {
@@ -46,6 +62,14 @@ export interface BakeParams {
   clips: Record<string, string>; // nama output → nama clip di glb
   layers: Record<string, LayerDef>;
   blade?: BladeSplit;
+  /** clip dari file terpisah: nama clip → `url` (clip pertama) atau `url#NamaClip`. */
+  animations?: Record<string, string>;
+  attachments?: Attachment[];
+  /**
+   * Outfit skinned dengan rig yang sama (mis. Quaternius Modular Outfits di atas Universal Base Characters).
+   * Mesh-nya di-bind ulang ke skeleton model utama, jadi ikut animasi yang sama.
+   */
+  outfits?: string[];
   /** mesh yang selalu disembunyikan. */
   hidden: string[];
   /** ramp gelap → terang. Index glyph hasil shape matching = shade level. */
@@ -65,34 +89,48 @@ export interface BakeParams {
   pad: number;
 }
 
+const Q = '/assets/models/quaternius';
+const UBC = '/assets/models/quaternius-ubc';
+
+// Karakter utama: badan Quaternius Universal Base Characters (Superhero_Male, proporsi realistis),
+// armor = outfit Ranger (rig sama), helm + pedang dari Quaternius Animated Knight Pack. Semua CC0.
+// Rig UE mannequin (`Head`, `hand_r`). Animasi dari Universal Animation Library (dipangkas ke 2 clip).
 export const DEFAULT_PARAMS: BakeParams = {
-  modelUrl: '/assets/models/kaykit/Knight.glb',
-  modelName: 'KayKit Adventurers 1.0 / Knight',
+  modelUrl: `${UBC}/Superhero_Male_FullBody.gltf`,
+  modelName: 'Quaternius Universal Base Characters / Superhero_Male + Ranger outfit',
   cols: 0,
-  rows: 60,
+  rows: 90,
   cellAspect: 0.5,
   sub: 6,
   fps: 12,
   yaw: -90,
   facing: 'right',
   pitch: 8,
-  clips: { idle: 'Idle', walk: 'Walking_A' },
+  animations: { idle: `${UBC}/UAL_idle_walk.glb#Idle_Loop`, walk: `${UBC}/UAL_idle_walk.glb#Walk_Loop` },
+  clips: { idle: 'idle', walk: 'walk' },
+  outfits: ['/assets/models/quaternius-outfits/Male_Ranger.gltf'],
+  attachments: [
+    { name: 'helmet', url: `${Q}/Helmet1.glb`, bone: 'Head', position: [0, 0.1, 0.02], rotation: [0, 0, 0], scale: 0.14 },
+    // Rotasi 45° di sumbu X tulang tangan = blade condong ke depan-bawah saat lengan turun.
+    { name: 'sword', url: `${Q}/Sword.glb`, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [45, 0, 0], scale: 0.22 },
+  ],
   layers: {
-    body: {
-      label: 'Badan',
+    body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes', 'Eyebrows'] } },
+    armor: {
+      label: 'Armor',
       parts: {
-        armor: ['Knight_Body', 'Knight_ArmLeft', 'Knight_ArmRight', 'Knight_LegLeft', 'Knight_LegRight'],
-        skin: ['Knight_Head'],
-        cloth: ['Knight_Cape'],
+        cloth: ['Male_Ranger_Body', 'Male_Ranger_Legs'],
+        leather: ['Male_Ranger_Body_Belt_1', 'Male_Ranger_Body_Belt_2', 'Male_Ranger_Feet_Boots', 'Male_Ranger_Arms_Bracer'],
+        armor: ['Male_Ranger_Acc_Pauldron'],
       },
     },
-    helmet: { label: 'Helm', parts: { helmet: ['Knight_Helmet'] } },
-    weapon: { label: 'Senjata', parts: { blade: ['1H_Sword'] } },
-    shield: { label: 'Perisai', parts: { shield: ['Round_Shield'] } },
+    helmet: { label: 'Helm', parts: { helmet: ['helmet:Grey', 'helmet:DarkGrey'] } },
+    weapon: { label: 'Senjata', parts: { blade: ['sword:Metal'], hilt: ['sword:Red', 'sword:Gold', 'sword:Brown'] } },
   },
-  // Pedang KayKit: sumbu lokal +Y, pommel -0.37, grip di 0, guard 0.15..0.25, ujung 1.41.
-  blade: { mesh: '1H_Sword', axis: 'y', at: 0.26, below: 'hilt', above: 'blade' },
-  hidden: ['1H_Sword_Offhand', 'Badge_Shield', 'Rectangle_Shield', 'Spike_Shield', '2H_Sword'],
+  // Pedang Quaternius: material Metal = blade, sumbu lokal +Z, blade mulai di 0.0069 (ujung 0.0386).
+  blade: { mesh: 'sword:Metal', axis: 'z', at: 0.0069, below: 'hilt', above: 'blade' },
+  // Mesh outfit yang tidak dipakai (lengan Ranger bertumpuk dengan lengan badan, hood diganti helm).
+  hidden: ['Male_Ranger_Arms_1', 'Male_Ranger_Arms_2', 'Male_Ranger_Head_Hood'],
   // Ramp density gelap → terang. Shape vector tetap memilih di antara glyph ini,
   // jadi tepi tetap mengikuti silhouette. Charset penuh terlalu ramai (lihat README).
   charset: '.:-=+*#%@',
@@ -177,22 +215,92 @@ export interface BakeContext {
   meshes: Map<string, THREE.Object3D>;
 }
 
-export async function loadModel(url: string, renderer: THREE.WebGLRenderer): Promise<BakeContext> {
+const loadAny = async (url: string): Promise<{ scene: THREE.Object3D; animations: THREE.AnimationClip[] }> => {
+  if (/\.fbx$/i.test(url)) {
+    const g = await new FBXLoader().loadAsync(url);
+    return { scene: g, animations: g.animations };
+  }
   const gltf = await new GLTFLoader().loadAsync(url);
+  return { scene: gltf.scene, animations: gltf.animations };
+};
+
+/** Nama tulang dibandingkan tanpa karakter non-alfanumerik (GLTF/FBX loader membuang ':' secara berbeda). */
+const norm = (n: string) => n.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): Promise<BakeContext> {
+  const model = await loadAny(p.modelUrl);
   const scene = new THREE.Scene();
-  const root = gltf.scene;
+  const root = model.scene;
   scene.add(root);
   const meshes = new Map<string, THREE.Object3D>();
   root.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) meshes.set(o.name, o);
   });
+
+  const boneByName = new Map<string, THREE.Bone>();
+  root.traverse((o) => {
+    if ((o as THREE.Bone).isBone) boneByName.set(norm(o.name), o as THREE.Bone);
+  });
+  for (const url of p.outfits ?? []) {
+    const outfit = (await loadAny(url)).scene;
+    outfit.updateMatrixWorld(true);
+    const skinned: THREE.SkinnedMesh[] = [];
+    outfit.traverse((o) => {
+      if ((o as THREE.SkinnedMesh).isSkinnedMesh) skinned.push(o as THREE.SkinnedMesh);
+    });
+    for (const m of skinned) {
+      const bones = m.skeleton.bones.map((b) => {
+        const mine = boneByName.get(norm(b.name));
+        if (!mine) throw new Error(`Tulang "${b.name}" dari outfit tidak ada di model`);
+        return mine;
+      });
+      const bindMatrix = m.bindMatrix.clone();
+      root.attach(m);
+      m.bind(new THREE.Skeleton(bones, m.skeleton.boneInverses), bindMatrix);
+      meshes.set(m.name, m);
+    }
+  }
+
+  const animations = [...model.animations];
+  for (const [name, ref] of Object.entries(p.animations ?? {})) {
+    // `url#NamaClip` memilih clip tertentu; tanpa `#` = clip pertama di file.
+    const [url, want] = ref.split('#');
+    const all = (await loadAny(url)).animations;
+    const clip = (want ? all.find((c) => c.name === want) : all[0])?.clone();
+    if (!clip) throw new Error(`Animasi ${ref} tidak ada`);
+    clip.name = name;
+    animations.push(clip);
+  }
+
+  for (const a of p.attachments ?? []) {
+    let bone: THREE.Object3D | undefined;
+    root.traverse((o) => {
+      if (!bone && norm(o.name) === norm(a.bone)) bone = o;
+    });
+    if (!bone) throw new Error(`Tulang "${a.bone}" tidak ada di model`);
+    const acc = (await loadAny(a.url)).scene;
+    const holder = new THREE.Group();
+    holder.name = a.name;
+    holder.add(acc);
+    holder.position.fromArray(a.position);
+    holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
+    holder.scale.setScalar(a.scale);
+    bone.add(holder);
+    acc.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.name = `${a.name}:${(m.material as THREE.Material).name}`;
+      meshes.set(m.name, m);
+    });
+  }
+
   return {
     renderer,
     scene,
     camera: new THREE.OrthographicCamera(),
     root,
     mixer: new THREE.AnimationMixer(root),
-    animations: gltf.animations,
+    animations,
     meshes,
   };
 }
