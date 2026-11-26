@@ -22,6 +22,9 @@ Mockup visual (claude.ai artifact): https://claude.ai/artifact/QuDeZgYmb947G6Hgd
 - **Tavern (Play):** customizer karakter untuk pengunjung. Pilih class (Warrior, Ranger, Rogue, Mage) yang mengisi
   loadout default, lalu ganti helm, armor, senjata, pet. Melee/Ranged ditentukan senjata. Karakter bisa berjalan.
   Ada slot eksperimen lain berstatus locked. Dikerjakan **setelah** Home dan Quest Log.
+  **Forge** (ala reel ansenjeo "Weapon Materials and Runes") ada di Tavern: 3–4 material blade (pasangan glyph +
+  warna, mis. `#%` Iron, `@%` Steel, `0o` Gold, `B8` Bloodiron) dan 2–3 rune (api, petir, darah) sebagai partikel
+  glyph di canvas + glow. Partikel mati saat `prefers-reduced-motion`. Tanpa inventory grid lengkap dan stats.
 - **Send a raven (Contact):** form kontak + Join party (GitHub, LinkedIn, email, CV).
 - **Recruiter mode:** tombol "Skip cutscene" ke satu halaman ringkas (CV, skill, tabel project, kontak). Tetap gelap
   dan monospace, tanpa ornamen game dan tanpa animasi.
@@ -44,6 +47,9 @@ Mockup visual (claude.ai artifact): https://claude.ai/artifact/QuDeZgYmb947G6Hgd
   - **Satu sudut kamera samping**; arah sebaliknya cukup mirror.
   - v1: 2–3 varian per slot.
   - Ukuran karakter: awalnya ±40×60, lalu diganti ke proporsi realistis ±90 baris (lihat Update di bawah).
+  - **Format sel (keputusan 2026-11-26):** simpan **shade level + part id** per sel, bukan char final. Runtime
+    memetakan shade ke charset + palet material, jadi ganti material tidak perlu re-bake. Senjata juga menyimpan
+    titik socket blade (pangkal, ujung) per frame untuk emitter partikel rune.
   - Sumber aset: KayKit Adventurers (CC0, sudah dipakai), Quaternius, Mixamo. Lisensi tiap aset wajib dicek.
 - **Kontak:** form service (Formspree atau Web3Forms), email sebagai fallback.
 - **Hosting:** VPS milik user dengan Caddy, deploy `dist` via GitHub Actions + rsync, hardening dasar.
@@ -71,7 +77,7 @@ diperkirakan ±90–100 baris untuk badan penuh, lebar badan ±25–30 kolom. Uj
 1. Aset final non-chibi bertema medieval (kandidat: Quaternius Modular Character Outfits – Fantasy + Universal
    Animation Library, atau Mixamo). Lisensi wajib dicek.
 2. Tinggi final: ±90 baris dengan font kecil (±6–7px) supaya rapat seperti referensi.
-3. Optimasi format (biner + delta, palet 16 warna) sebelum masuk portfolio.
+3. Optimasi format (biner + delta, shade level + part id sudah diputuskan) sebelum masuk portfolio.
 4. Font final.
 5. Isi konten asli untuk semua placeholder.
 6. Domain.
