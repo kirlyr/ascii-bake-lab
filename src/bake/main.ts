@@ -8,9 +8,10 @@ if (!preset) throw new Error(`Preset model "${modelKey}" tidak ada. Pilihan: ${O
 import type { BakeFile } from '../shared/format';
 import { composeFrame, createGrid, decodeSprite } from '../shared/compose';
 import { AsciiCanvas } from '../shared/ascii-canvas';
+import { lookFor } from '../shared/materials';
 
 // Parameter yang bisa diubah dari form. Sisanya (layer, clip, mesh) di presets.ts.
-const FIELDS: (keyof BakeParams)[] = ['cols', 'rows', 'fps', 'yaw', 'pitch', 'sub', 'minLight', 'gamma', 'sharpness', 'minCoverage', 'paletteSize', 'ambient', 'keyLight', 'rimLight'];
+const FIELDS: (keyof BakeParams)[] = ['cols', 'rows', 'fps', 'yaw', 'pitch', 'sub', 'minLight', 'gamma', 'sharpness', 'minCoverage', 'ambient', 'keyLight', 'rimLight'];
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const form = $<HTMLFormElement>('params');
@@ -44,9 +45,10 @@ async function run(p = readParams()) {
   const sprite = decodeSprite(result);
   const grid = createGrid(result.cols, result.rows);
   composeFrame(sprite, grid, 'idle', 0, Object.keys(result.layers), false);
-  const ac = new AsciiCanvas(preview, result.palette, result.cellAspect);
+  const ac = new AsciiCanvas(preview, result.cellAspect);
+  ac.setLook({ parts: result.parts, ramp: result.ramp, materials: lookFor(result.parts) });
   ac.resize(result.cols, result.rows);
-  ac.draw(grid, 'texture');
+  ac.draw(grid, 'material', true);
   // Render 3D pose idle frame 0 dengan framing yang sama, sebagai pembanding.
   for (const [name, m] of ctx.meshes) m.visible = !p.hidden.includes(name);
   ctx.mixer.stopAllAction();

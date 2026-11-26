@@ -1,8 +1,31 @@
 // Format file hasil bake. Dipakai bake tool (menulis) dan player (membaca).
 // Tidak boleh import Three.js di sini, karena player ikut memakainya.
+//
+// v2: tiap sel menyimpan shade level + part id + depth, bukan char final.
+// Runtime memetakan (part, shade) → glyph + warna lewat material (lihat materials.ts),
+// jadi material bisa diganti tanpa re-bake.
 
 /** Nilai depth untuk sel kosong. Depth 0 = paling dekat ke kamera. */
 export const EMPTY_DEPTH = 255;
+
+/** Maksimum shade level dan part. Satu byte sel = part * 16 + shade. */
+export const MAX_SHADES = 16;
+export const MAX_PARTS = 16;
+export const packCell = (part: number, shade: number) => part * MAX_SHADES + shade;
+export const cellPart = (cell: number) => cell >> 4;
+export const cellShade = (cell: number) => cell & 15;
+
+/**
+ * Socket dalam koordinat grid (unit sel, kontinu, y ke bawah, sebelum mirror).
+ * [x, y, depth 0..254]. Mirror: x' = cols - x.
+ */
+export type SocketPoint = [number, number, number];
+
+/** Socket blade: pangkal (guard) dan ujung. Dipakai emitter partikel rune. */
+export interface BladeSocket {
+  base: SocketPoint;
+  tip: SocketPoint;
+}
 
 /** Satu frame satu layer, di-crop ke bounding box sel yang terisi. */
 export interface FrameData {
@@ -10,12 +33,12 @@ export interface FrameData {
   y: number;
   w: number;
   h: number;
-  /** w*h karakter, baris demi baris. Spasi = kosong. */
-  chars: string;
+  /** base64 Uint8Array(w*h). packCell(part, shade). Abaikan kalau depth kosong. */
+  cell: string;
   /** base64 Uint8Array(w*h). 0..254 = depth, 255 = kosong. */
   depth: string;
-  /** base64 Uint8Array(w*h). Index ke `palette`. */
-  color: string;
+  /** hanya di layer senjata. */
+  blade?: BladeSocket;
 }
 
 export interface LayerData {
@@ -25,7 +48,7 @@ export interface LayerData {
 }
 
 export interface BakeFile {
-  version: 1;
+  version: 2;
   model: string;
   cols: number;
   rows: number;
@@ -34,7 +57,10 @@ export interface BakeFile {
   fps: number;
   /** arah hadap hasil bake. Arah sebaliknya = mirror di runtime. */
   facing: 'right' | 'left';
-  palette: string[];
+  /** charset yang dipakai shape matching. Index = shade level (gelap → terang). */
+  ramp: string;
+  /** nama part. Index = part id. */
+  parts: string[];
   layers: Record<string, LayerData>;
   bakedAt: string;
   params: Record<string, unknown>;

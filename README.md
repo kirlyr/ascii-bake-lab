@@ -1,7 +1,8 @@
 # ascii-bake-lab
 
 Eksperimen pipeline **baked ASCII** untuk portfolio MMORPG medieval: model 3D (glTF) di-render sekali menjadi frame ASCII
-(char + depth + warna per sel), lalu diputar di browser tanpa Three.js.
+(**shade level + part id + depth** per sel), lalu diputar di browser tanpa Three.js. Glyph dan warna final ditentukan
+**material** di runtime, jadi material bisa diganti tanpa re-bake.
 
 ![demo](docs/media/knight-demo.gif)
 
@@ -15,36 +16,56 @@ npm run dev
 - `http://localhost:5173/bake.html?model=knight` → **bake tool** (dev only, pakai Three.js). Atur parameter, klik **Bake**, lalu
   **Simpan ke public/baked/knight.json** (endpoint dev di `vite.config.ts`) atau **Download JSON**.
 - `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), toggle layer,
-  mode warna Tekstur/Medieval/Depth. Tahan ← / → untuk berjalan.
-- `npm run build` hanya mem-build player. Hasil saat ini: JS 5,5 KB (2,7 KB gzip), Three.js tidak ikut.
+  material blade (Iron/Steel/Gold/Bloodiron), rune api, mode warna Material/Part/Depth, penanda socket blade.
+  Tahan ← / → untuk berjalan.
+- `npm run build` hanya mem-build player. Hasil saat ini: JS 7,8 KB (3,8 KB gzip), Three.js tidak ikut.
 
 ## Cara kerja bake
 
 1. Load `assets/models/kaykit/Knight.glb`, kamera **orthographic samping** (`yaw -90`, hadap kanan, `pitch 8`).
 2. Framing diukur dari silhouette semua pose (bukan bounding box geometri, karena bbox skinned mesh terlalu longgar).
    Tinggi model = `rows`. `cols = 0` berarti lebar grid otomatis.
-3. Per layer (badan, helm, senjata, perisai) dan per frame: render warna (lit) + depth ke render target
-   `cols*6 × rows*12` px, lalu tiap sel diringkas jadi:
-   - **char**: shape vector 2×3 region dari kecerahan sub-pixel, dicocokkan ke glyph JetBrains Mono Bold terdekat
-     (charset ramp `.:-=+*#%@`). Ini yang memberi volume dan tepi silhouette, beda dengan `AsciiEffect` Three.js yang
-     hanya rata-rata brightness.
+3. Per layer (badan, helm, senjata, perisai) dan per frame: render 3 pass ke render target `cols*6 × rows*12` px
+   (warna lit, depth, part id), lalu tiap sel diringkas jadi:
+   - **shade level**: shape vector 2×3 region dari kecerahan sub-pixel, dicocokkan ke glyph JetBrains Mono Bold terdekat
+     di ramp `.:-=+*#%@`. Index glyph itu = shade level (0..8). Jadi tepi silhouette dari shape vector tetap terbawa,
+     walau char final baru dipilih di runtime.
+   - **part id**: part mayoritas di sel. Part diatur per mesh di preset (`layers.<x>.parts`). Mesh senjata bisa dibagi dua
+     di sepanjang sumbu lokalnya (`blade: { mesh, axis, at, below, above }`), mis. pedang KayKit: `hilt` (pommel–guard)
+     dan `blade`.
    - **depth**: 0..254 (255 = kosong), dinormalisasi ke rentang depth model.
-   - **warna**: rata-rata warna lit, dikuantisasi ke palet 32 warna bersama.
-4. Frame di-crop ke bounding box sel terisi, depth/warna disimpan sebagai base64 Uint8Array.
+4. Layer senjata juga menyimpan **socket blade** per frame: `base` (titik potong hilt/blade) dan `tip`, dalam koordinat
+   grid `[x, y, depth]`. Dipakai emitter partikel rune.
+5. Frame di-crop ke bounding box sel terisi. Satu byte per sel `part * 16 + shade` + satu byte depth, base64.
 
-Runtime (`src/shared/compose.ts`): untuk tiap sel, pilih layer dengan depth terkecil. Mirror = balik kolom +
-tukar glyph asimetris (`/`↔`\`, `(`↔`)`, dst). Canvas menggambar per run warna yang sama, ligature font dimatikan.
+Format lengkap: `src/shared/format.ts` (BakeFile v2). File v1 (char final) tidak didukung lagi.
+
+## Runtime
+
+- `src/shared/compose.ts`: tiap sel pilih layer dengan depth terkecil. Mirror = balik kolom; socket ikut di-mirror.
+- `src/shared/materials.ts`: material = glyph per shade level + stop warna gelap→terang. Look default per part
+  (kulit, pelat, kain, kulit samak, kayu) plus 4 material blade dari reel ansenjeo (`#%` Iron, `@%` Steel, `0o` Gold,
+  `B8` Bloodiron). Level rendah tetap `.:-=` supaya tepi tidak hilang.
+- `src/shared/ascii-canvas.ts`: material dikompilasi jadi tabel 256 entri (byte sel → glyph + warna), jadi ganti material
+  = bangun ulang tabel, tanpa decode ulang frame. Glyph asimetris ditukar saat mirror (`/`↔`\`, dst).
+- `src/shared/runes.ts`: rune api = emitter partikel glyph (`^^*:.`) di sepanjang socket blade, warna sesuai umur + glow.
+  Partikel diupdate tiap rAF (sprite tetap 12 fps) dan **mati total saat `prefers-reduced-motion`**.
+
+![material blade](docs/media/blade-materials.png)
+
+![rune api](docs/media/rune-fire.gif)
 
 ## Hasil saat ini (Knight, 4 layer × 2 clip × 13 frame @12fps)
 
-| | Ukuran |
-|---|---|
-| Grid | 99 × 60 sel (lebar karena pedang ke depan dan perisai di belakang; badan saja ±48 kolom) |
-| `knight.json` | 624 KB mentah, **121 KB gzip** |
-| Per layer (mentah) | badan 246 KB, helm 176 KB, senjata 121 KB, perisai 81 KB |
-| Player JS | 5,5 KB (2,7 KB gzip) |
+| | v1 (char + depth + warna) | v2 (shade+part + depth) |
+|---|---|---|
+| Grid | 99 × 60 | 99 × 60 |
+| `knight.json` | 624 KB mentah / 121 KB gzip | **456 KB mentah / 86 KB gzip** |
+| `soldier.json` (90 baris, 2 layer) | 940 KB / 176 KB gzip | **684 KB / 109 KB gzip** |
+| Player JS | 5,5 KB (2,7 KB gzip) | 7,8 KB (3,8 KB gzip) |
 
-Ruang optimasi yang belum dikerjakan: format biner + delta antar frame, palet 16 warna (4 bit), fps 8–10.
+Grid knight lebar karena pedang ke depan dan perisai di belakang; badan saja ±48 kolom.
+Ruang optimasi yang belum dikerjakan: format biner (tanpa base64) + delta antar frame, fps 8–10.
 
 ## Uji proporsi realistis (non-chibi)
 

@@ -56,11 +56,11 @@ export async function buildGlyphSet(charset: string, fontFamily: string, cellAsp
   return { chars, vecs };
 }
 
-/** Cari glyph terdekat (Euclidean) dengan cache kuantisasi. */
+/** Cari glyph terdekat (Euclidean) dengan cache kuantisasi. Hasil = index glyph (shade level). */
 export function makeMatcher(set: GlyphSet) {
-  const cache = new Map<number, string>();
+  const cache = new Map<number, number>();
   const n = set.chars.length;
-  return (v: Float32Array): string => {
+  return (v: Float32Array): number => {
     let key = 0;
     for (let r = 0; r < DIMS; r++) key = key * 16 + Math.min(15, Math.round(v[r] * 15));
     const hit = cache.get(key);
@@ -78,8 +78,7 @@ export function makeMatcher(set: GlyphSet) {
         best = g;
       }
     }
-    const ch = set.chars[best];
-    cache.set(key, ch);
-    return ch;
+    cache.set(key, best);
+    return best;
   };
 }
