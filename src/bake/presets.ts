@@ -22,4 +22,25 @@ export const PRESETS: Record<string, BakeParams> = {
     blade: undefined,
     hidden: [],
   },
+  // Uji pasang aksesori Quaternius ke rig Mixamo (sementara, sebelum karakter final ada).
+  mtest: {
+    ...DEFAULT_PARAMS,
+    modelUrl: '/assets/models/threejs-examples/Soldier.glb',
+    modelName: 'test',
+    rows: 90,
+    yaw: 90,
+    facing: 'left',
+    clips: { idle: 'Idle', walk: 'Walk' },
+    layers: {
+      body: { label: 'Badan', parts: { armor: ['vanguard_Mesh'] } },
+      helmet: { label: 'Helm', parts: { helmet: ['helmet:Grey', 'helmet:DarkGrey'] } },
+      weapon: { label: 'Senjata', parts: { blade: ['sword:Metal'], hilt: ['sword:Red', 'sword:Gold', 'sword:Brown'] } },
+    },
+    hidden: ['vanguard_visor'],
+    attachments: [
+      { name: 'helmet', url: '/assets/models/quaternius/Helmet1.glb', bone: 'mixamorigHead', position: [0, 10, 2], rotation: [0, 0, 0], scale: 14 },
+      { name: 'sword', url: '/assets/models/quaternius/Sword.glb', bone: 'mixamorigRightHand', position: [0, 8, 3], rotation: [0, 0, 0], scale: 23 },
+    ],
+    blade: { mesh: 'sword:Metal', axis: 'z', at: 0.0069, below: 'hilt', above: 'blade' },
+  },
 };

@@ -2,6 +2,7 @@
 // Three.js hanya dipakai di sini (dev). Output = BakeFile JSON v2.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { b64encode, EMPTY_DEPTH, MAX_PARTS, MAX_SHADES, packCell, type BakeFile, type BladeSocket, type FrameData, type SocketPoint } from '../shared/format';
 import { buildGlyphSet, makeMatcher, DIMS, REG_X, REG_Y } from './glyphs';
 
@@ -25,6 +26,21 @@ export interface BladeSplit {
   above: string;
 }
 
+/**
+ * Aksesori (helm, pedang, dll.) dari file terpisah yang dipasang ke tulang model saat bake.
+ * Mesh-nya terdaftar sebagai `<name>:<nama material>`, jadi part bisa dipetakan per material.
+ */
+export interface Attachment {
+  name: string;
+  url: string;
+  /** nama tulang, tanpa ':' (mis. `mixamorigHead`). */
+  bone: string;
+  /** offset di ruang tulang. rotation dalam derajat (XYZ). */
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: number;
+}
+
 const layerMeshes = (l: LayerDef) => Object.values(l.parts).flat();
 
 export interface BakeParams {
@@ -46,6 +62,9 @@ export interface BakeParams {
   clips: Record<string, string>; // nama output → nama clip di glb
   layers: Record<string, LayerDef>;
   blade?: BladeSplit;
+  /** clip dari file terpisah (mis. animasi Mixamo "Without Skin"): nama clip → url. Clip pertama di file dipakai. */
+  animations?: Record<string, string>;
+  attachments?: Attachment[];
   /** mesh yang selalu disembunyikan. */
   hidden: string[];
   /** ramp gelap → terang. Index glyph hasil shape matching = shade level. */
@@ -177,22 +196,65 @@ export interface BakeContext {
   meshes: Map<string, THREE.Object3D>;
 }
 
-export async function loadModel(url: string, renderer: THREE.WebGLRenderer): Promise<BakeContext> {
+const loadAny = async (url: string): Promise<{ scene: THREE.Object3D; animations: THREE.AnimationClip[] }> => {
+  if (/\.fbx$/i.test(url)) {
+    const g = await new FBXLoader().loadAsync(url);
+    return { scene: g, animations: g.animations };
+  }
   const gltf = await new GLTFLoader().loadAsync(url);
+  return { scene: gltf.scene, animations: gltf.animations };
+};
+
+/** Nama tulang dibandingkan tanpa karakter non-alfanumerik (GLTF/FBX loader membuang ':' secara berbeda). */
+const norm = (n: string) => n.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): Promise<BakeContext> {
+  const model = await loadAny(p.modelUrl);
   const scene = new THREE.Scene();
-  const root = gltf.scene;
+  const root = model.scene;
   scene.add(root);
   const meshes = new Map<string, THREE.Object3D>();
   root.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) meshes.set(o.name, o);
   });
+
+  const animations = [...model.animations];
+  for (const [name, url] of Object.entries(p.animations ?? {})) {
+    const clip = (await loadAny(url)).animations[0];
+    if (!clip) throw new Error(`Tidak ada animasi di ${url}`);
+    clip.name = name;
+    animations.push(clip);
+  }
+
+  for (const a of p.attachments ?? []) {
+    let bone: THREE.Object3D | undefined;
+    root.traverse((o) => {
+      if (!bone && norm(o.name) === norm(a.bone)) bone = o;
+    });
+    if (!bone) throw new Error(`Tulang "${a.bone}" tidak ada di model`);
+    const acc = (await loadAny(a.url)).scene;
+    const holder = new THREE.Group();
+    holder.name = a.name;
+    holder.add(acc);
+    holder.position.fromArray(a.position);
+    holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
+    holder.scale.setScalar(a.scale);
+    bone.add(holder);
+    acc.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.name = `${a.name}:${(m.material as THREE.Material).name}`;
+      meshes.set(m.name, m);
+    });
+  }
+
   return {
     renderer,
     scene,
     camera: new THREE.OrthographicCamera(),
     root,
     mixer: new THREE.AnimationMixer(root),
-    animations: gltf.animations,
+    animations,
     meshes,
   };
 }

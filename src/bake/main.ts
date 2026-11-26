@@ -34,7 +34,7 @@ renderer.setSize(240, 360, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 let result: BakeFile | null = null;
-const ctx = await loadModel(preset.modelUrl, renderer);
+const ctx = await loadModel(preset, renderer);
 $('save').textContent = `Simpan ke public/baked/${modelKey}.json`;
 status.textContent = `Model ${modelKey} siap. Clip: ${ctx.animations.length}, mesh: ${ctx.meshes.size}.`;
 
@@ -82,4 +82,6 @@ $('save').onclick = async () => {
 };
 
 // Untuk bake headless (Playwright): window.__bake(overrides) → BakeFile
+// Daftar nama mesh (termasuk aksesori `<name>:<material>`) untuk mengisi preset.
+(window as unknown as Record<string, unknown>).__meshes = [...ctx.meshes.keys()];
 (window as unknown as Record<string, unknown>).__bake = (o: Partial<BakeParams> = {}) => run({ ...readParams(), ...o });
