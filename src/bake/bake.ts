@@ -8,6 +8,13 @@ import { buildGlyphSet, makeMatcher, DIMS, REG_X, REG_Y } from './glyphs';
 
 export interface LayerDef {
   label: string;
+  /**
+   * Slot equipment (mis. `helmet`, `weapon`). Layer dengan slot sama = varian yang saling menggantikan;
+   * player memasang maksimal satu per slot. Tanpa slot = selalu tampil (badan).
+   */
+  slot?: string;
+  /** hanya layer senjata: split hilt/blade + sumber socket blade. */
+  blade?: BladeSplit;
   /** meter. Layer ini menang atas layer yang lebih dekat ≤ jarak ini (lihat LayerData.bias). */
   bias?: number;
   /** part → mesh. Part menentukan material di runtime (lihat src/shared/materials.ts). */
@@ -41,6 +48,8 @@ export interface Attachment {
   position: [number, number, number];
   rotation: [number, number, number];
   scale: number;
+  /** derajat. Putar aksesori di sumbu panjangnya (Y setelah node -90° X) sebelum `rotation`. */
+  spin?: number;
 }
 
 export interface PoseOverlay {
@@ -74,7 +83,6 @@ export interface BakeParams {
   pitch: number;
   clips: Record<string, string>; // nama output → nama clip di glb
   layers: Record<string, LayerDef>;
-  blade?: BladeSplit;
   /** clip dari file terpisah: nama clip → `url` (clip pertama) atau `url#NamaClip`. */
   animations?: Record<string, string>;
   /**
@@ -126,6 +134,10 @@ const Q = '/assets/models/quaternius';
 const UBC = '/assets/models/quaternius-ubc';
 const UAL = `${UBC}/UAL_subset.glb`;
 const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'].flatMap((f) => [1, 2, 3].map((i) => `${f}_0${i}_r`));
+// Semua helm/senjata Knight Pack punya origin + skala sama, jadi satu posisi attach per slot.
+const helm = (name: string, url: string): Attachment => ({ name, url, bone: 'Head', position: [0, 0.1, 0.02], rotation: [0, 0, 0], scale: 0.14 });
+// Dengan pose kepalan Sword_Idle: blade turun ke depan, sisi lebar menghadap kamera (Z 90°).
+const weapon = (name: string, url: string, spin = 0): Attachment => ({ name, url, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [25, 0, 90], scale: 0.22, spin });
 const SWORD_ARM: PoseOverlay = { from: `${UAL}#Sword_Idle`, at: 0, bones: ['clavicle_r', 'upperarm_r', 'lowerarm_r', 'hand_r', ...FINGERS] };
 
 // Karakter utama: badan Quaternius Universal Base Characters (Superhero_Male, proporsi realistis),
@@ -150,14 +162,17 @@ export const DEFAULT_PARAMS: BakeParams = {
   outfits: ['/assets/models/quaternius-outfits/Male_Ranger.gltf'],
   outfitInflate: 0.02,
   attachments: [
-    { name: 'helmet', url: `${Q}/Helmet1.glb`, bone: 'Head', position: [0, 0.1, 0.02], rotation: [0, 0, 0], scale: 0.14 },
-    // Dengan pose kepalan Sword_Idle: blade turun ke depan, sisi lebar menghadap kamera (Z 90°).
-    { name: 'sword', url: `${Q}/Sword.glb`, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [25, 0, 90], scale: 0.22 },
+    ...['Helmet1', 'Helmet2', 'Helmet3'].map((h) => helm(h.toLowerCase(), `${Q}/${h}.glb`)),
+    weapon('sword', `${Q}/Sword.glb`),
+    weapon('shortsword', `${Q}/ShortSword.glb`),
+    // Sisi lebar Katana ada di sumbu lokal lain dari pedang Quaternius lainnya.
+    weapon('katana', `${Q}/Katana.glb`, 90),
   ],
   layers: {
     body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes', 'Eyebrows'] } },
     armor: {
-      label: 'Armor',
+      label: 'Rompi Ranger',
+      slot: 'armor',
       // Badan Superhero lebih besar dari tubuh untuk outfit Ranger: kulit menembus rompi beberapa cm.
       bias: 0.04,
       parts: {
@@ -166,11 +181,30 @@ export const DEFAULT_PARAMS: BakeParams = {
         armor: ['Male_Ranger_Acc_Pauldron'],
       },
     },
-    helmet: { label: 'Helm', parts: { helmet: ['helmet:Grey', 'helmet:DarkGrey'] } },
-    weapon: { label: 'Senjata', parts: { blade: ['sword:Metal'], hilt: ['sword:Red', 'sword:Gold', 'sword:Brown'] } },
+    // Varian per slot = layer terpisah. Ukuran file = jumlah layer, bukan kombinasi.
+    helmet1: { label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
+    helmet2: { label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
+    helmet3: { label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
+    // Pedang Quaternius: blade sudah mesh terpisah, sumbu lokal +Z. `at` = pangkal blade (sumber socket).
+    sword: {
+      label: 'Pedang',
+      slot: 'weapon',
+      parts: { blade: ['sword:Metal'], hilt: ['sword:Red', 'sword:Gold', 'sword:Brown'] },
+      blade: { mesh: 'sword:Metal', axis: 'z', at: 0.0069, below: 'hilt', above: 'blade' },
+    },
+    shortsword: {
+      label: 'Pedang Pendek',
+      slot: 'weapon',
+      parts: { blade: ['shortsword:Grey'], hilt: ['shortsword:Red', 'shortsword:Gold', 'shortsword:Brown'] },
+      blade: { mesh: 'shortsword:Grey', axis: 'z', at: 0.0062, below: 'hilt', above: 'blade' },
+    },
+    katana: {
+      label: 'Katana',
+      slot: 'weapon',
+      parts: { blade: ['katana:Metal'], hilt: ['katana:Black', 'katana:Golden'] },
+      blade: { mesh: 'katana:Metal', axis: 'z', at: 0.0046, below: 'hilt', above: 'blade' },
+    },
   },
-  // Pedang Quaternius: material Metal = blade, sumbu lokal +Z, blade mulai di 0.0069 (ujung 0.0386).
-  blade: { mesh: 'sword:Metal', axis: 'z', at: 0.0069, below: 'hilt', above: 'blade' },
   // Mesh outfit yang tidak dipakai (lengan Ranger bertumpuk dengan lengan badan, hood diganti helm).
   hidden: ['Male_Ranger_Arms_1', 'Male_Ranger_Arms_2', 'Male_Ranger_Head_Hood'],
   // Ramp density gelap → terang. Shape vector tetap memilih di antara glyph ini,
@@ -351,6 +385,7 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     const holder = new THREE.Group();
     holder.name = a.name;
     holder.add(acc);
+    acc.rotation.y = THREE.MathUtils.degToRad(a.spin ?? 0);
     holder.position.fromArray(a.position);
     holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
     holder.scale.setScalar(a.scale);
@@ -579,28 +614,30 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
     return parts.indexOf(name);
   };
   for (const l of Object.values(p.layers)) for (const [part, ms] of Object.entries(l.parts)) for (const m of ms) partOf.set(m, addPart(part));
-  const split = p.blade && ctx.meshes.has(p.blade.mesh) ? p.blade : undefined;
-  if (split) addPart(split.below), addPart(split.above);
+  const splits = new Map<string, BladeSplit>();
+  for (const l of Object.values(p.layers)) if (l.blade && ctx.meshes.has(l.blade.mesh)) splits.set(l.blade.mesh, l.blade);
+  for (const s of splits.values()) addPart(s.below), addPart(s.above);
   if (parts.length > MAX_PARTS) throw new Error(`part maksimal ${MAX_PARTS}`);
 
   // Material pass id per mesh. Mesh di luar layer tetap dapat id (tidak terlihat juga).
   const idMats = new Map<THREE.Object3D, THREE.ShaderMaterial>();
   for (const [name, m] of ctx.meshes) {
     const id = partOf.get(name) ?? 0;
-    idMats.set(m, split?.mesh === name ? makeIdMaterial(parts.indexOf(split.below), parts.indexOf(split.above), AXES[split.axis], split.at) : makeIdMaterial(id));
+    const split = splits.get(name);
+    idMats.set(m, split ? makeIdMaterial(parts.indexOf(split.below), parts.indexOf(split.above), AXES[split.axis], split.at) : makeIdMaterial(id));
   }
 
   // Socket blade di ruang lokal mesh: pangkal = titik potong, ujung = ujung sumbu sisi `above`.
-  let bladeLocal: { base: THREE.Vector3; tip: THREE.Vector3; mesh: THREE.Object3D } | null = null;
-  if (split) {
+  type BladeLocal = { base: THREE.Vector3; tip: THREE.Vector3; mesh: THREE.Object3D };
+  const bladeLocalOf = (split: BladeSplit): BladeLocal => {
     const mesh = ctx.meshes.get(split.mesh)! as THREE.Mesh;
     mesh.geometry.computeBoundingBox();
     const bb = mesh.geometry.boundingBox!;
     const c = bb.getCenter(new THREE.Vector3());
     const base = c.clone().setComponent('xyz'.indexOf(split.axis), split.at);
     const tip = c.clone().setComponent('xyz'.indexOf(split.axis), bb.max[split.axis]);
-    bladeLocal = { base, tip, mesh };
-  }
+    return { base, tip, mesh };
+  };
   const project = (v: THREE.Vector3): SocketPoint => {
     const view = v.clone().applyMatrix4(cam.matrixWorldInverse);
     const ndc = v.clone().project(cam);
@@ -608,8 +645,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
     const r1 = (x: number) => Math.round(x * 10) / 10;
     return [r1(((ndc.x + 1) / 2) * p.cols), r1(((1 - ndc.y) / 2) * p.rows), d];
   };
-  const bladeSocket = (): BladeSocket | undefined => {
-    if (!bladeLocal) return undefined;
+  const bladeSocket = (bladeLocal: BladeLocal): BladeSocket => {
     const mw = bladeLocal.mesh.matrixWorld;
     return { base: project(bladeLocal.base.clone().applyMatrix4(mw)), tip: project(bladeLocal.tip.clone().applyMatrix4(mw)) };
   };
@@ -706,9 +742,10 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
   for (const [layerKey, layer] of Object.entries(p.layers)) {
     const meshes = new Set(layerMeshes(layer));
     out.layers[layerKey] = { label: layer.label, clips: {} };
+    if (layer.slot) out.layers[layerKey].slot = layer.slot;
     if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
     setVisible(ctx, meshes);
-    const withBlade = !!split && meshes.has(split.mesh);
+    const blade = layer.blade && splits.has(layer.blade.mesh) ? bladeLocalOf(layer.blade) : null;
     for (const [clipKey, clipName] of Object.entries(p.clips)) {
       const clip = poseAt(ctx, clipName, 0);
       const n = frameCount(clip, p.fps);
@@ -730,7 +767,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
           shade[ci] = match(v);
         }
         const frame = cropFrame(p, shade, cells);
-        if (withBlade) frame.blade = bladeSocket();
+        if (blade) frame.blade = bladeSocket(blade);
         frames.push(frame);
         if (f === 0) onProgress(`${layer.label} / ${clipKey}: ${n} frame`);
         await new Promise((res) => setTimeout(res, 0));

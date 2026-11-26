@@ -21,6 +21,8 @@ export const MATERIALS = {
   leather: { label: 'Kulit samak', colors: ['#4e3220', '#946038', '#d8a870'] },
   wood: { label: 'Kayu', colors: ['#4a3420', '#8a6038', '#c89a60'] },
   visor: { label: 'Visor', colors: ['#2a3a26', '#8fae6a'] },
+  // Hiasan helm: warna emas tanpa ganti glyph, supaya bentuk helm tetap dari ramp bake.
+  brass: { label: 'Kuningan', colors: ['#5a3e10', '#b88a3a', '#f0d080'] },
   // Material blade (Forge). Pasangan glyph mengikuti reel ansenjeo.
   iron: { label: 'Iron #%', glyphs: '.:-=+##%%', colors: ['#4a4a4e', '#9c9ca0', '#e0e0dc'] },
   steel: { label: 'Steel @%', glyphs: '.:-=+@@%%', colors: ['#34404c', '#90a4b8', '#eef4fa'] },
@@ -42,6 +44,7 @@ export const DEFAULT_LOOK: Record<string, MaterialKey> = {
   blade: 'iron',
   shield: 'wood',
   visor: 'visor',
+  trim: 'brass',
 };
 
 export const lookFor = (parts: string[], overrides: Record<string, MaterialKey> = {}): Record<string, Material> =>

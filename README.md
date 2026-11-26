@@ -15,10 +15,10 @@ npm run dev
 
 - `http://localhost:5173/bake.html` → **bake tool** (dev only, pakai Three.js). Atur parameter, klik **Bake**, lalu
   **Simpan ke public/baked/hero.json** (endpoint dev di `vite.config.ts`) atau **Download JSON**.
-- `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), toggle layer,
+- `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), equipment per slot,
   material blade (Iron/Steel/Gold/Bloodiron), rune api, mode warna Material/Part/Depth, penanda socket blade.
   Tahan ← / → untuk berjalan.
-- `npm run build` hanya mem-build player. Hasil saat ini: JS 7,8 KB (3,8 KB gzip), Three.js tidak ikut.
+- `npm run build` hanya mem-build player. Hasil saat ini: JS 10,3 KB (4,8 KB gzip), Three.js tidak ikut.
 
 ## Cara kerja bake
 
@@ -44,6 +44,32 @@ npm run dev
 5. Frame di-crop ke bounding box sel terisi. Satu byte per sel `part * 16 + shade` + satu byte depth, base64.
 
 Format lengkap: `src/shared/format.ts` (BakeFile v2). File v1 (char final) tidak didukung lagi.
+
+## Equipment (varian per slot)
+
+Tiap varian equipment = **satu layer bake** dengan field `slot` (`armor`, `helmet`, `weapon`). Ukuran file = jumlah
+layer, bukan kombinasi: 3 helm + 3 senjata = 6 layer kecil, bukan 9 kombinasi badan penuh. Semua varian di-bake
+dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
+
+- Player memasang maksimal satu layer per slot (`activeLayers` / `defaultEquipment` di `compose.ts`), atau slot
+  dikosongkan ("Lepas"). Ganti equipment = ganti daftar layer yang di-compose, tanpa decode ulang.
+- Tiap layer senjata punya `blade` sendiri (split hilt/blade + sumber socket), jadi material blade dan rune api jalan
+  di semua senjata.
+- Aksesori Knight Pack punya origin + skala sama, jadi satu posisi attach per slot (`helm()` / `weapon()` di preset).
+  Katana diputar 90° di sumbu panjangnya (`spin`) karena sisi lebarnya ada di sumbu lokal lain.
+
+| Slot | Varian | Part |
+|---|---|---|
+| Armor | Rompi Ranger | cloth, leather, armor |
+| Helm | Helm Besi (`Helmet1`), Helm Ksatria (`Helmet2`), Helm Bangsawan (`Helmet3`) | helmet, trim (hiasan emas) |
+| Senjata | Pedang (`Sword`), Pedang Pendek (`ShortSword`), Katana | blade, hilt |
+
+![varian equipment](docs/media/equipment.png)
+
+Kiri ke kanan: Helm Besi + Pedang (Iron), Helm Ksatria + Pedang Pendek (Steel), Helm Bangsawan + Katana (Gold),
+tanpa helm dan senjata. Di 90 baris, beda helm terutama terbaca dari silhouette (jambul Helm Bangsawan paling jelas).
+Belum dipakai: `Club` (tanpa blade, perlu keputusan apakah ikut material blade) dan `ShoulderPads` (Ranger sudah
+punya pauldron).
 
 ## Runtime
 
@@ -84,13 +110,13 @@ Perbaikan karakter (PR #5):
 
 ![sebelum dan sesudah](docs/media/hero-before-after.png)
 
-## Hasil saat ini (hero, 4 layer × 2 clip @12fps)
+## Hasil saat ini (hero, 8 layer × 2 clip @12fps)
 
 | | |
 |---|---|
-| Grid | 104 × 90 (sebelumnya 158 × 90 karena pedang terayun ke belakang) |
-| `hero.json` | 1,52 MB mentah / **170 KB gzip** (sebelumnya 250 KB; kuantisasi depth) |
-| Player JS | ±8 KB (±4 KB gzip), tanpa Three.js |
+| Grid | 100 × 90 |
+| `hero.json` | 1,66 MB mentah / **183 KB gzip** (4 layer: 170 KB; tiap varian helm/senjata ±3–5 KB gzip) |
+| Player JS | 10,3 KB (4,8 KB gzip), tanpa Three.js |
 
 Ruang optimasi yang belum dikerjakan: format biner tanpa base64 (uji: ±130 KB gzip), delta antar frame, fps 8–10.
 

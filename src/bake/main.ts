@@ -8,7 +8,7 @@ const modelKey = query.get('model') ?? 'hero';
 const preset = PRESETS[modelKey] && { ...PRESETS[modelKey], ...JSON.parse(query.get('o') ?? '{}') };
 if (!preset) throw new Error(`Preset model "${modelKey}" tidak ada. Pilihan: ${Object.keys(PRESETS).join(', ')}`);
 import type { BakeFile } from '../shared/format';
-import { composeFrame, createGrid, decodeSprite } from '../shared/compose';
+import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment } from '../shared/compose';
 import { AsciiCanvas } from '../shared/ascii-canvas';
 import { lookFor } from '../shared/materials';
 
@@ -40,19 +40,29 @@ const ctx = await loadModel(preset, renderer);
 $('save').textContent = `Simpan ke public/baked/${modelKey}.json`;
 status.textContent = `Model ${modelKey} siap. Clip: ${ctx.animations.length}, mesh: ${ctx.meshes.size}.`;
 
+// Preview 3D: layer tanpa slot + varian pertama tiap slot (varian lain saling tumpuk).
+function showLayers(p: BakeParams, keys?: string[]) {
+  const seen = new Set<string>();
+  keys ??= Object.entries(p.layers)
+    .filter(([, l]) => !l.slot || (!seen.has(l.slot) && seen.add(l.slot)))
+    .map(([k]) => k);
+  const show = new Set(keys.flatMap((k) => Object.values(p.layers[k].parts).flat()));
+  for (const [name, m] of ctx.meshes) m.visible = show.has(name) && !p.hidden.includes(name);
+}
+
 async function run(p = readParams()) {
   $<HTMLButtonElement>('bake').disabled = true;
   const t0 = performance.now();
   result = await bake(ctx, p, (msg) => (status.textContent = msg));
   const sprite = decodeSprite(result);
   const grid = createGrid(result.cols, result.rows);
-  composeFrame(sprite, grid, 'idle', 0, Object.keys(result.layers), false);
+  composeFrame(sprite, grid, 'idle', 0, activeLayers(result, defaultEquipment(result)), false);
   const ac = new AsciiCanvas(preview, result.cellAspect);
   ac.setLook({ parts: result.parts, ramp: result.ramp, materials: lookFor(result.parts) });
   ac.resize(result.cols, result.rows);
   ac.draw(grid, 'material', true);
   // Render 3D pose idle frame 0 dengan framing yang sama, sebagai pembanding.
-  for (const [name, m] of ctx.meshes) m.visible = !p.hidden.includes(name);
+  showLayers(p);
   ctx.mixer.stopAllAction();
   ctx.mixer.clipAction(ctx.animations.find((a) => a.name === p.clips.idle)!).reset().play();
   ctx.mixer.setTime(0);
@@ -88,9 +98,9 @@ $('save').onclick = async () => {
 (window as unknown as Record<string, unknown>).__meshes = [...ctx.meshes.keys()];
 (window as unknown as Record<string, unknown>).__bake = (o: Partial<BakeParams> = {}) => run({ ...readParams(), ...o });
 // Inspeksi 3D (setelah bake, framing sama): window.__view('walk', 0.5) → dataURL render pose itu.
-(window as unknown as Record<string, unknown>).__view = (clip: string, t: number) => {
+(window as unknown as Record<string, unknown>).__view = (clip: string, t: number, layers?: string[]) => {
   const p = readParams();
-  for (const [name, m] of ctx.meshes) m.visible = !p.hidden.includes(name);
+  showLayers(p, layers);
   ctx.mixer.stopAllAction();
   ctx.mixer.clipAction(ctx.animations.find((a) => a.name === (p.clips[clip] ?? clip))!).reset().play();
   ctx.mixer.setTime(t);

@@ -1,6 +1,6 @@
 // Player produksi: memutar JSON hasil bake sebagai teks di canvas. Tanpa Three.js.
 import type { BakeFile } from '../shared/format';
-import { composeFrame, createGrid, decodeSprite } from '../shared/compose';
+import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
 import { RUNES, RuneEmitter, type RuneKey } from '../shared/runes';
 import { BLADE_MATERIALS, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
@@ -29,22 +29,30 @@ const state = {
   mode: 'material' as ColorMode,
   blade: 'iron' as MaterialKey,
   sockets: false,
-  layers: new Set(Object.keys(file.layers)),
+  equip: defaultEquipment(file),
   playing: !reducedMotion,
   rune: null as RuneEmitter | null,
   frame: 0,
 };
 
-// Layer toggle. Badan selalu ada; layer lain membuktikan compose berbasis depth.
-const layersEl = $<HTMLElement>('#layers');
-for (const [key, layer] of Object.entries(file.layers)) {
-  const disabled = key === 'body' ? 'disabled' : '';
-  layersEl.insertAdjacentHTML('beforeend', `<label><input type="checkbox" value="${key}" checked ${disabled}> ${layer.label}</label>`);
+// Equipment per slot: pilih satu varian atau kosongkan. Tiap varian = satu layer bake,
+// jadi ganti equipment = ganti daftar layer yang di-compose, tanpa decode ulang.
+const SLOT_LABEL: Record<string, string> = { helmet: 'Helm', armor: 'Armor', weapon: 'Senjata' };
+const equipEl = $<HTMLElement>('#equip');
+for (const slot of Object.keys(state.equip)) {
+  const variants = Object.entries(file.layers).filter(([, l]) => l.slot === slot);
+  const buttons = [...variants.map(([k, l]) => [k, l.label]), ['', 'Lepas']]
+    .map(([k, label]) => `<button data-slot="${slot}" data-layer="${k}" aria-pressed="${state.equip[slot] === k}">${label}</button>`)
+    .join('');
+  const name = SLOT_LABEL[slot] ?? slot;
+  equipEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${name}</span><div class="row" role="group" aria-label="${name}">${buttons}</div>`);
 }
-layersEl.addEventListener('change', (e) => {
-  const input = e.target as HTMLInputElement;
-  if (input.checked) state.layers.add(input.value);
-  else state.layers.delete(input.value);
+equipEl.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-slot]');
+  if (!b) return;
+  const slot = b.dataset.slot!;
+  state.equip[slot] = b.dataset.layer || null;
+  equipEl.querySelectorAll<HTMLButtonElement>(`[data-slot="${slot}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   draw();
 });
 
@@ -113,7 +121,7 @@ function paint() {
   view.draw(grid, state.mode, state.sockets);
   state.rune?.draw(view.ctx, grid, view.cellW, view.cellH, view.background);
 }
-const compose = () => composeFrame(sprite, grid, state.clip, state.frame, [...state.layers], state.facing !== file.facing);
+const compose = () => composeFrame(sprite, grid, state.clip, state.frame, activeLayers(file, state.equip), state.facing !== file.facing);
 function draw() {
   compose();
   paint();

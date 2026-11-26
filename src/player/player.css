@@ -17,3 +17,6 @@ button[aria-pressed="true"] { color:var(--gold); border-color:var(--gold); }
 button:focus-visible, input:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
 label { display:flex; gap:6px; align-items:center; cursor:pointer; }
 input[type="checkbox"] { accent-color: var(--gold); }
+.slots { display:flex; flex-direction:column; gap:4px; }
+.slot-name { color:var(--muted); margin-top:4px; }
+.slot-name::before { content:'▸ '; color:var(--border); }
