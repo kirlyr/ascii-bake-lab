@@ -5,7 +5,7 @@ import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
 import { RUNES, RuneEmitter, type RuneKey } from '../shared/runes';
 import { BLADE_MATERIALS, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
 
-const MODEL = new URLSearchParams(location.search).get('model') ?? 'knight';
+const MODEL = new URLSearchParams(location.search).get('model') ?? 'hero';
 const URL_JSON = `${import.meta.env.BASE_URL}baked/${MODEL}.json`;
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;

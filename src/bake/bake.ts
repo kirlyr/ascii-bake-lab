@@ -65,6 +65,11 @@ export interface BakeParams {
   /** clip dari file terpisah: nama clip → `url` (clip pertama) atau `url#NamaClip`. */
   animations?: Record<string, string>;
   attachments?: Attachment[];
+  /**
+   * Outfit skinned dengan rig yang sama (mis. Quaternius Modular Outfits di atas Universal Base Characters).
+   * Mesh-nya di-bind ulang ke skeleton model utama, jadi ikut animasi yang sama.
+   */
+  outfits?: string[];
   /** mesh yang selalu disembunyikan. */
   hidden: string[];
   /** ramp gelap → terang. Index glyph hasil shape matching = shade level. */
@@ -84,34 +89,48 @@ export interface BakeParams {
   pad: number;
 }
 
+const Q = '/assets/models/quaternius';
+const UBC = '/assets/models/quaternius-ubc';
+
+// Karakter utama: badan Quaternius Universal Base Characters (Superhero_Male, proporsi realistis),
+// armor = outfit Ranger (rig sama), helm + pedang dari Quaternius Animated Knight Pack. Semua CC0.
+// Rig UE mannequin (`Head`, `hand_r`). Animasi dari Universal Animation Library (dipangkas ke 2 clip).
 export const DEFAULT_PARAMS: BakeParams = {
-  modelUrl: '/assets/models/kaykit/Knight.glb',
-  modelName: 'KayKit Adventurers 1.0 / Knight',
+  modelUrl: `${UBC}/Superhero_Male_FullBody.gltf`,
+  modelName: 'Quaternius Universal Base Characters / Superhero_Male + Ranger outfit',
   cols: 0,
-  rows: 60,
+  rows: 90,
   cellAspect: 0.5,
   sub: 6,
   fps: 12,
   yaw: -90,
   facing: 'right',
   pitch: 8,
-  clips: { idle: 'Idle', walk: 'Walking_A' },
+  animations: { idle: `${UBC}/UAL_idle_walk.glb#Idle_Loop`, walk: `${UBC}/UAL_idle_walk.glb#Walk_Loop` },
+  clips: { idle: 'idle', walk: 'walk' },
+  outfits: ['/assets/models/quaternius-outfits/Male_Ranger.gltf'],
+  attachments: [
+    { name: 'helmet', url: `${Q}/Helmet1.glb`, bone: 'Head', position: [0, 0.1, 0.02], rotation: [0, 0, 0], scale: 0.14 },
+    // Rotasi 45° di sumbu X tulang tangan = blade condong ke depan-bawah saat lengan turun.
+    { name: 'sword', url: `${Q}/Sword.glb`, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [45, 0, 0], scale: 0.22 },
+  ],
   layers: {
-    body: {
-      label: 'Badan',
+    body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes', 'Eyebrows'] } },
+    armor: {
+      label: 'Armor',
       parts: {
-        armor: ['Knight_Body', 'Knight_ArmLeft', 'Knight_ArmRight', 'Knight_LegLeft', 'Knight_LegRight'],
-        skin: ['Knight_Head'],
-        cloth: ['Knight_Cape'],
+        cloth: ['Male_Ranger_Body', 'Male_Ranger_Legs'],
+        leather: ['Male_Ranger_Body_Belt_1', 'Male_Ranger_Body_Belt_2', 'Male_Ranger_Feet_Boots', 'Male_Ranger_Arms_Bracer'],
+        armor: ['Male_Ranger_Acc_Pauldron'],
       },
     },
-    helmet: { label: 'Helm', parts: { helmet: ['Knight_Helmet'] } },
-    weapon: { label: 'Senjata', parts: { blade: ['1H_Sword'] } },
-    shield: { label: 'Perisai', parts: { shield: ['Round_Shield'] } },
+    helmet: { label: 'Helm', parts: { helmet: ['helmet:Grey', 'helmet:DarkGrey'] } },
+    weapon: { label: 'Senjata', parts: { blade: ['sword:Metal'], hilt: ['sword:Red', 'sword:Gold', 'sword:Brown'] } },
   },
-  // Pedang KayKit: sumbu lokal +Y, pommel -0.37, grip di 0, guard 0.15..0.25, ujung 1.41.
-  blade: { mesh: '1H_Sword', axis: 'y', at: 0.26, below: 'hilt', above: 'blade' },
-  hidden: ['1H_Sword_Offhand', 'Badge_Shield', 'Rectangle_Shield', 'Spike_Shield', '2H_Sword'],
+  // Pedang Quaternius: material Metal = blade, sumbu lokal +Z, blade mulai di 0.0069 (ujung 0.0386).
+  blade: { mesh: 'sword:Metal', axis: 'z', at: 0.0069, below: 'hilt', above: 'blade' },
+  // Mesh outfit yang tidak dipakai (lengan Ranger bertumpuk dengan lengan badan, hood diganti helm).
+  hidden: ['Male_Ranger_Arms_1', 'Male_Ranger_Arms_2', 'Male_Ranger_Head_Hood'],
   // Ramp density gelap → terang. Shape vector tetap memilih di antara glyph ini,
   // jadi tepi tetap mengikuti silhouette. Charset penuh terlalu ramai (lihat README).
   charset: '.:-=+*#%@',
@@ -217,6 +236,30 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
   root.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) meshes.set(o.name, o);
   });
+
+  const boneByName = new Map<string, THREE.Bone>();
+  root.traverse((o) => {
+    if ((o as THREE.Bone).isBone) boneByName.set(norm(o.name), o as THREE.Bone);
+  });
+  for (const url of p.outfits ?? []) {
+    const outfit = (await loadAny(url)).scene;
+    outfit.updateMatrixWorld(true);
+    const skinned: THREE.SkinnedMesh[] = [];
+    outfit.traverse((o) => {
+      if ((o as THREE.SkinnedMesh).isSkinnedMesh) skinned.push(o as THREE.SkinnedMesh);
+    });
+    for (const m of skinned) {
+      const bones = m.skeleton.bones.map((b) => {
+        const mine = boneByName.get(norm(b.name));
+        if (!mine) throw new Error(`Tulang "${b.name}" dari outfit tidak ada di model`);
+        return mine;
+      });
+      const bindMatrix = m.bindMatrix.clone();
+      root.attach(m);
+      m.bind(new THREE.Skeleton(bones, m.skeleton.boneInverses), bindMatrix);
+      meshes.set(m.name, m);
+    }
+  }
 
   const animations = [...model.animations];
   for (const [name, ref] of Object.entries(p.animations ?? {})) {

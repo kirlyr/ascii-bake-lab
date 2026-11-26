@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import { bake, loadModel, type BakeParams } from './bake';
 import { PRESETS } from './presets';
 
-const modelKey = new URLSearchParams(location.search).get('model') ?? 'knight';
-const preset = PRESETS[modelKey];
+const query = new URLSearchParams(location.search);
+const modelKey = query.get('model') ?? 'hero';
+// `?o={...}` menimpa field preset sebelum model dimuat (dipakai untuk tuning posisi aksesori).
+const preset = PRESETS[modelKey] && { ...PRESETS[modelKey], ...JSON.parse(query.get('o') ?? '{}') };
 if (!preset) throw new Error(`Preset model "${modelKey}" tidak ada. Pilihan: ${Object.keys(PRESETS).join(', ')}`);
 import type { BakeFile } from '../shared/format';
 import { composeFrame, createGrid, decodeSprite } from '../shared/compose';

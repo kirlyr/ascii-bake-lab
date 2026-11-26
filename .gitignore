@@ -2,13 +2,3 @@ node_modules/
 dist/
 .DS_Store
 *.local
-
-# Mixamo: tidak boleh diredistribusi, unduh sendiri (lihat README)
-assets/models/threejs-examples/
-
-# Sementara: kandidat model + bake preview, belum dipilih user (jangan di-commit dulu)
-assets/models/quaternius-ubc/
-assets/models/quaternius-outfits/
-public/baked/hero.json
-public/baked/ranger.json
-public/baked/peasant.json
