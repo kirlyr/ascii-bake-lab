@@ -14,7 +14,8 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Palet: latar `#120e0a`, panel `#1b1510`, border `#4a3b2a`, teks `#ead9b5`, muted `#b0a083`, aksen `#d4a64a`,
   merah `#d8644c`, hijau `#8fae6a`. Animasi mati saat `prefers-reduced-motion`.
 - Karakter: bake per layer (badan/helm/armor/senjata/pet), tiap sel = char + depth + warna, compose runtime pilih
-  depth terdekat. Satu sudut kamera samping, arah sebaliknya = mirror. v1: 2–3 varian per slot. Ukuran ±40×60.
+  depth terdekat. Satu sudut kamera samping, arah sebaliknya = mirror. v1: 2–3 varian per slot.
+- Proporsi karakter **realistis, bukan chibi** (seperti referensi IG ansenjeo), tinggi ±90 baris, font kecil supaya rapat.
 - Three.js hanya di bake tool (dev). Build produksi tidak boleh membawa Three.js.
 - Kontak: form service (Formspree/Web3Forms). Hosting: VPS user + Caddy, deploy `dist` via GitHub Actions rsync.
   Domain belum ada.
@@ -22,10 +23,12 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 ## Status (2026-11-26)
 - Prototype bake tool + player selesai di repo ini (KayKit Knight CC0, idle + walk, 4 layer, mirror). Lihat README
   untuk hasil dan ukuran file.
+- Uji proporsi realistis: preset `soldier` (Mixamo, glb tidak di-commit), 90 baris. KayKit Knight (chibi) hanya
+  dipakai untuk membuktikan pipeline.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
-1. User review kualitas prototype dan putuskan ukuran grid final + model (lihat "Masih terbuka" di `docs/PLAN.md`).
+1. Pilih aset final non-chibi bertema medieval + cek lisensinya (lihat "Masih terbuka" di `docs/PLAN.md`).
 2. Optimasi format output jika perlu.
 3. Buat repo portfolio, pindahkan bake tool, mulai dari intro + Character (Home).
 

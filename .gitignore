@@ -2,3 +2,6 @@ node_modules/
 dist/
 .DS_Store
 *.local
+
+# Mixamo: tidak boleh diredistribusi, unduh sendiri (lihat README)
+assets/models/threejs-examples/

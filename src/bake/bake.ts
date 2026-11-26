@@ -22,6 +22,8 @@ export interface BakeParams {
   fps: number;
   /** derajat. 0 = kamera di depan model, -90 = samping (model hadap kanan). */
   yaw: number;
+  /** arah hadap model di hasil bake (tergantung orientasi model + yaw). */
+  facing: 'left' | 'right';
   /** derajat, kamera sedikit dari atas. */
   pitch: number;
   clips: Record<string, string>; // nama output → nama clip di glb
@@ -46,7 +48,7 @@ export interface BakeParams {
 }
 
 export const DEFAULT_PARAMS: BakeParams = {
-  modelUrl: '',
+  modelUrl: '/assets/models/kaykit/Knight.glb',
   modelName: 'KayKit Adventurers 1.0 / Knight',
   cols: 0,
   rows: 60,
@@ -54,6 +56,7 @@ export const DEFAULT_PARAMS: BakeParams = {
   sub: 6,
   fps: 12,
   yaw: -90,
+  facing: 'right',
   pitch: 8,
   clips: { idle: 'Idle', walk: 'Walking_A' },
   layers: {
@@ -453,7 +456,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
     rows: p.rows,
     cellAspect: p.cellAspect,
     fps: p.fps,
-    facing: p.yaw < 0 ? 'right' : 'left',
+    facing: p.facing,
     palette: palette.map(hex),
     layers: {},
     bakedAt: new Date().toISOString(),

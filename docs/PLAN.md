@@ -43,7 +43,7 @@ Mockup visual (claude.ai artifact): https://claude.ai/artifact/QuDeZgYmb947G6Hgd
     depth terdekat ke kamera.
   - **Satu sudut kamera samping**; arah sebaliknya cukup mirror.
   - v1: 2–3 varian per slot.
-  - Ukuran karakter ±40×60 karakter (lihat catatan prototype di bawah).
+  - Ukuran karakter: awalnya ±40×60, lalu diganti ke proporsi realistis ±90 baris (lihat Update di bawah).
   - Sumber aset: KayKit Adventurers (CC0, sudah dipakai), Quaternius, Mixamo. Lisensi tiap aset wajib dicek.
 - **Kontak:** form service (Formspree atau Web3Forms), email sebagai fallback.
 - **Hosting:** VPS milik user dengan Caddy, deploy `dist` via GitHub Actions + rsync, hardening dasar.
@@ -62,9 +62,15 @@ Kualitas sudah ada volume (ramp `.:-=+*#%@` + shape vector), compose by depth da
 Catatan: dengan tinggi 60 baris, grid jadi 99×60 karena pedang mengarah ke depan dan perisai di belakang;
 badan saja ±48 kolom. Output 624 KB mentah / 121 KB gzip.
 
+Update 2026-11-26: user menolak proporsi chibi. Karakter harus **proporsi realistis seperti referensi ansenjeo**.
+Referensi (IG ansenjeo, panel CRAFT): karakter rapat seperti dot-matrix, terlihat ±70 baris dalam panel dan
+diperkirakan ±90–100 baris untuk badan penuh, lebar badan ±25–30 kolom. Uji proporsi dengan Soldier (Mixamo)
+90 baris sudah ada di repo (`?model=soldier`), 176 KB gzip untuk 2 layer.
+
 ## Masih terbuka
-1. Ukuran grid final: tinggi 60 baris (detail bagus, file besar) atau ±40–45 baris supaya lebar total mendekati 40–70.
-2. Pilihan model/proporsi: KayKit chibi (kepala besar) cocok atau perlu model proporsi lain.
+1. Aset final non-chibi bertema medieval (kandidat: Quaternius Modular Character Outfits – Fantasy + Universal
+   Animation Library, atau Mixamo). Lisensi wajib dicek.
+2. Tinggi final: ±90 baris dengan font kecil (±6–7px) supaya rapat seperti referensi.
 3. Optimasi format (biner + delta, palet 16 warna) sebelum masuk portfolio.
 4. Font final.
 5. Isi konten asli untuk semua placeholder.

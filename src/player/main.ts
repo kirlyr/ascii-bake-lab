@@ -3,10 +3,12 @@ import type { BakeFile } from '../shared/format';
 import { composeFrame, createGrid, decodeSprite } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
 
-const URL_JSON = `${import.meta.env.BASE_URL}baked/knight.json`;
+const MODEL = new URLSearchParams(location.search).get('model') ?? 'knight';
+const URL_JSON = `${import.meta.env.BASE_URL}baked/${MODEL}.json`;
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const info = $<HTMLElement>('#info');
+$<HTMLElement>('h1').textContent = `┤ ${MODEL.toUpperCase()} ├`;
 
 const res = await fetch(URL_JSON);
 const text = await res.text();

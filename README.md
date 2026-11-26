@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-- `http://localhost:5173/bake.html` → **bake tool** (dev only, pakai Three.js). Atur parameter, klik **Bake**, lalu
+- `http://localhost:5173/bake.html?model=knight` → **bake tool** (dev only, pakai Three.js). Atur parameter, klik **Bake**, lalu
   **Simpan ke public/baked/knight.json** (endpoint dev di `vite.config.ts`) atau **Download JSON**.
 - `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), toggle layer,
   mode warna Tekstur/Medieval/Depth. Tahan ← / → untuk berjalan.
@@ -45,6 +45,32 @@ tukar glyph asimetris (`/`↔`\`, `(`↔`)`, dst). Canvas menggambar per run war
 | Player JS | 5,5 KB (2,7 KB gzip) |
 
 Ruang optimasi yang belum dikerjakan: format biner + delta antar frame, palet 16 warna (4 bit), fps 8–10.
+
+## Uji proporsi realistis (non-chibi)
+
+`/bake.html?model=soldier` dan `/?model=soldier`. Model **Soldier** dari contoh Three.js (karakter Mixamo "Vanguard"),
+tinggi 90 baris, layer badan + visor. Tujuannya membuktikan proporsi seperti referensi ansenjeo, bukan aset final
+(bukan medieval).
+
+![soldier](docs/media/soldier-walk.png)
+
+| | |
+|---|---|
+| Grid | 123 × 90 (lebar karena langkah walk; badan saat idle ±30 kolom) |
+| `soldier.json` | 940 KB mentah, **176 KB gzip** (2 layer × 2 clip × 12 frame) |
+
+File `.glb` **tidak di-commit** karena lisensi Mixamo melarang redistribusi file mentah (hasil render/bake boleh
+dipakai di project). Untuk bake ulang:
+
+```bash
+mkdir -p assets/models/threejs-examples
+curl -o assets/models/threejs-examples/Soldier.glb \
+  https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb
+```
+
+Kandidat aset final non-chibi medieval: Quaternius "Modular Character Outfits – Fantasy" + "Universal Animation
+Library" (diklaim CC0 dan modular, cocok untuk layer customization; lisensi belum diverifikasi karena situsnya tidak
+bisa diakses dari cloud), atau karakter + animasi Mixamo. Tambahkan preset baru di `src/bake/presets.ts`.
 
 ## Aset
 
