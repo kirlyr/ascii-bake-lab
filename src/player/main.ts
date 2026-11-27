@@ -3,7 +3,9 @@ import { loadBake, type BakeFile, type TurnFile } from '../shared/format';
 import { activeLayers, composeFrame, createGrid, decodeSprite, type Sprite } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
 import { AURAS, RUNES, RuneEmitter, alongBlade, alongEdge, type AuraKey, type RuneKey, type Spawn } from '../shared/runes';
-import { BLADE_MATERIALS, DYEABLE, MATERIALS, type MaterialKey } from '../shared/materials';
+import { BLADE_MATERIALS, DYEABLE, DYES, MATERIALS, type MaterialKey } from '../shared/materials';
+import { SLOTS, itemText } from '../shared/items';
+import { drawIcon, layerParts } from '../shared/icons';
 import { loadLoadout, materialsFor, saveLoadout } from '../shared/loadout';
 
 const MODEL = new URLSearchParams(location.search).get('model') ?? 'hero';
@@ -11,7 +13,6 @@ const URL_BAKE = `${import.meta.env.BASE_URL}baked/${MODEL}.bake`;
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const info = $<HTMLElement>('#info');
-$<HTMLElement>('h1').textContent = `┤ ${MODEL.toUpperCase()} ├`;
 
 // `<model>-turn.bake` (opsional) = 16 arah idle napas (4 frame) untuk memutar karakter. Di portfolio cukup dimuat di Tavern.
 const [main, turnBake] = await Promise.all([loadBake<BakeFile>(URL_BAKE), loadBake<TurnFile>(URL_BAKE.replace(/\.bake$/, '-turn.bake'))]);
@@ -50,78 +51,261 @@ const state = {
 // Titik spawn aura per slot, dihitung ulang tiap compose (frame/equipment/arah berganti).
 const auraSpawn: Record<string, Spawn> = {};
 
-// Equipment per slot: pilih satu varian atau kosongkan. Tiap varian = satu layer bake,
-// jadi ganti equipment = ganti daftar layer yang di-compose, tanpa decode ulang.
-const SLOT_LABEL: Record<string, string> = { helmet: 'Helm', shoulder: 'Bahu', torso: 'Baju', legs: 'Celana', feet: 'Sepatu', weapon: 'Senjata', armor: 'Armor' };
-const auraOptions = ['<option value="">Aura: tanpa</option>', ...Object.entries(AURAS).map(([k, a]) => `<option value="${k}">Aura: ${a.label}</option>`)].join('');
-const equipEl = $<HTMLElement>('#equip');
-for (const slot of Object.keys(state.equip)) {
-  const variants = Object.entries(file.layers).filter(([, l]) => l.slot === slot);
-  const buttons = [...variants.map(([k, l]) => [k, l.label]), ['', 'Lepas']]
-    .map(([k, label]) => `<button data-slot="${slot}" data-layer="${k}" aria-pressed="${state.equip[slot] === k}">${label}</button>`)
-    .join('');
-  const name = SLOT_LABEL[slot] ?? slot;
-  const aura = reducedMotion ? '' : `<select data-aura="${slot}" aria-label="Aura ${name}">${auraOptions}</select>`;
-  equipEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${name} ${aura}</span><div class="row" role="group" aria-label="${name}">${buttons}</div>`);
+// ── Inventory ────────────────────────────────────────────────────────────────
+// Tiap varian equipment = satu layer bake dengan `slot`. Ganti equipment = ganti daftar layer yang
+// di-compose, tanpa decode ulang. Ikon item = layer itu sendiri (lihat icons.ts).
+const items = Object.entries(file.layers).filter(([, l]) => l.slot).map(([k]) => k);
+const slotOf = (key: string) => file.layers[key].slot!;
+const slotLabel = (slot: string) => SLOTS.find((s) => s.key === slot)?.label ?? slot;
+const text = (key: string) => itemText(key, file.layers[key].label);
+let filter: string | null = null;
+let selected: string | null = state.equip.weapon ?? items[0];
+/** item/slot yang sedang di-drag (dataTransfer tidak bisa dibaca saat dragover). */
+let dragging: { item?: string; fromSlot?: string } | null = null;
+
+const look = () => ({ parts: file.parts, ramp: file.ramp, materials: materialsFor(file, lo) });
+const applyLook = () => {
+  view.setLook(look());
+  document.querySelectorAll<HTMLCanvasElement>('canvas[data-icon]').forEach((c) => drawIcon(c, sprite, c.dataset.icon!, look(), +c.dataset.box!));
+};
+const icon = (key: string, box: number) => `<canvas data-icon="${key}" data-box="${box}" aria-hidden="true"></canvas>`;
+const paintIcons = (root: HTMLElement) =>
+  root.querySelectorAll<HTMLCanvasElement>('canvas[data-icon]').forEach((c) => drawIcon(c, sprite, c.dataset.icon!, look(), +c.dataset.box!));
+
+function equip(key: string) {
+  state.equip[slotOf(key)] = key;
+  changed();
 }
+function unequip(slot: string) {
+  state.equip[slot] = null;
+  changed();
+}
+function changed() {
+  save();
+  renderSlots();
+  renderBag();
+  renderDetail();
+  draw();
+}
+
+const SLOT_SIDE = { 'slots-l': ['helmet', 'shoulder', 'torso'], 'slots-r': ['weapon', 'legs', 'feet'] };
+function renderSlots() {
+  for (const [id, slots] of Object.entries(SLOT_SIDE)) {
+    const el = $<HTMLElement>(`#${id}`);
+    el.innerHTML = slots
+      .filter((slot) => slot in state.equip)
+      .map((slot) => {
+        const k = state.equip[slot];
+        const name = k ? text(k).name : 'empty';
+        return `<button class="slot" data-slot="${slot}" draggable="${!!k}" aria-pressed="${filter === slot}" aria-label="${slotLabel(slot)}: ${name}">
+          <span class="slot-label">${slotLabel(slot)}</span>${k ? icon(k, 64) : '<span class="empty">—</span>'}</button>`;
+      })
+      .join('');
+    paintIcons(el);
+  }
+}
+
+const bagEl = $<HTMLElement>('#bag');
+function renderBag() {
+  const list = items.filter((k) => !filter || slotOf(k) === filter);
+  bagEl.innerHTML = list
+    .map((k) => {
+      const worn = state.equip[slotOf(k)] === k;
+      return `<li><button class="item${worn ? ' worn' : ''}" data-item="${k}" draggable="true" aria-pressed="${selected === k}"
+        aria-label="${text(k).name}${worn ? ' (equipped)' : ''}">${icon(k, 52)}${worn ? '<span class="badge">E</span>' : ''}</button></li>`;
+    })
+    .join('');
+  paintIcons(bagEl);
+}
+
+const filterEl = $<HTMLElement>('#bag-filter');
+function renderFilter() {
+  filterEl.innerHTML = [['', 'All'], ...SLOTS.filter((s) => s.key in state.equip).map((s) => [s.key, s.label])]
+    .map(([k, label]) => `<button data-filter="${k}" aria-pressed="${(filter ?? '') === k}">${label}</button>`)
+    .join('');
+}
+filterEl.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-filter]');
+  if (!b) return;
+  filter = b.dataset.filter || null;
+  renderFilter();
+  renderSlots();
+  renderBag();
+});
+
+const detailEl = $<HTMLElement>('#detail');
+const choice = (attr: string, value: string, label: string, on: boolean, extra = '') =>
+  `<button data-${attr}="${value}" aria-pressed="${on}" ${extra}>${label}</button>`;
+function renderDetail() {
+  if (!selected) {
+    detailEl.innerHTML = '<p class="muted">Select an item.</p>';
+    return;
+  }
+  const k = selected;
+  const t = text(k);
+  const slot = slotOf(k);
+  const worn = state.equip[slot] === k;
+  const parts = layerParts(sprite, k);
+  let html = `<div class="detail-icon">${icon(k, 180)}</div>
+    <h2 class="item-name">${t.name}</h2>
+    <p class="muted">${t.kind || slotLabel(slot)}</p>
+    <p>${t.desc}</p>
+    <button class="primary" data-act="${worn ? 'off' : 'on'}">${worn ? 'Take off' : 'Equip'}</button>`;
+  if (parts.includes('blade')) {
+    html += `<h3>Blade material</h3><div class="row">${BLADE_MATERIALS.map((m) => choice('blade', m, MATERIALS[m].label, lo.blade === m)).join('')}</div>`;
+  }
+  if (!reducedMotion && slot === 'weapon') {
+    html += `<h3>Rune</h3><div class="row">${choice('rune', '', 'None', !lo.rune)}${Object.entries(RUNES)
+      .map(([r, d]) => choice('rune', r, d.label, lo.rune === r))
+      .join('')}</div>`;
+  }
+  for (const part of parts.filter((p) => DYEABLE[p])) {
+    const d = DYEABLE[part];
+    html += `<h3>${d.label} dye</h3><div class="row" role="group" aria-label="${d.label} dye">${Object.entries(d.palette)
+      .map(([key, m]) =>
+        choice('dye', key, '', lo.dye[part] === key, `class="swatch" data-part="${part}" aria-label="${m.label}" title="${m.label}" style="--c:${m.colors[1]}"`),
+      )
+      .join('')}</div>`;
+  }
+  if (parts.some((p) => DYEABLE[p]?.palette === DYES)) html += '<p class="muted note">Dye colours every worn item made of the same material.</p>';
+  if (!reducedMotion) {
+    html += `<h3>Aura</h3><div class="row">${choice('aura', '', 'None', !lo.auras[slot])}${Object.entries(AURAS)
+      .map(([a, d]) => choice('aura', a, d.label, lo.auras[slot] === a))
+      .join('')}</div>`;
+    if (!worn) html += '<p class="muted note">Aura and rune show once the item is equipped.</p>';
+  } else {
+    html += '<p class="muted note">Runes and auras are off because reduced motion is on.</p>';
+  }
+  detailEl.innerHTML = html;
+  paintIcons(detailEl);
+}
+detailEl.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
+  if (!b || !selected) return;
+  const slot = slotOf(selected);
+  const d = b.dataset;
+  if (d.act === 'on') return equip(selected);
+  if (d.act === 'off') return unequip(slot);
+  if (d.blade) lo.blade = d.blade as MaterialKey;
+  else if (d.rune !== undefined) setRune((d.rune || null) as RuneKey | null);
+  else if (d.part) lo.dye[d.part] = d.dye!;
+  else if (d.aura !== undefined) setAura(slot, (d.aura || null) as AuraKey | null);
+  else return;
+  save();
+  if (d.blade || d.part) applyLook();
+  renderDetail();
+  draw();
+});
+
+function select(key: string) {
+  selected = key;
+  bagEl.querySelectorAll<HTMLButtonElement>('[data-item]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.item === key)));
+  renderDetail();
+}
+bagEl.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-item]');
+  if (b) select(b.dataset.item!);
+});
+bagEl.addEventListener('dblclick', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-item]');
+  if (!b) return;
+  const k = b.dataset.item!;
+  if (state.equip[slotOf(k)] === k) unequip(slotOf(k));
+  else equip(k);
+});
+bagEl.addEventListener('keydown', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-item]');
+  if (!b || e.key !== 'Enter') return;
+  e.preventDefault(); // Enter = equip/lepas, bukan klik
+  select(b.dataset.item!);
+  const k = b.dataset.item!;
+  if (state.equip[slotOf(k)] === k) unequip(slotOf(k));
+  else equip(k);
+  bagEl.querySelector<HTMLButtonElement>(`[data-item="${k}"]`)?.focus();
+});
+// Klik slot: filter bag ke slot itu + tampilkan item yang dipakai.
+for (const id of Object.keys(SLOT_SIDE)) {
+  $<HTMLElement>(`#${id}`).addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-slot]');
+    if (!b) return;
+    const slot = b.dataset.slot!;
+    filter = filter === slot ? null : slot;
+    if (state.equip[slot]) selected = state.equip[slot];
+    renderFilter();
+    renderSlots();
+    renderBag();
+    renderDetail();
+  });
+}
+
+// Drag & drop (HTML5 DnD, desktop dulu). Item → slot yang cocok / ke karakter = pakai. Slot → bag = lepas.
+const highlight = (slot: string | null) =>
+  document.querySelectorAll<HTMLElement>('.slot').forEach((el) => el.classList.toggle('drop-ok', el.dataset.slot === slot));
+document.addEventListener('dragstart', (e) => {
+  const t = e.target as HTMLElement;
+  const item = t.closest<HTMLElement>('[data-item]')?.dataset.item;
+  const fromSlot = t.closest<HTMLElement>('.slot')?.dataset.slot;
+  if (!item && !(fromSlot && state.equip[fromSlot])) return;
+  dragging = item ? { item } : { fromSlot };
+  e.dataTransfer!.setData('text/plain', item ?? state.equip[fromSlot!]!);
+  e.dataTransfer!.effectAllowed = 'move';
+  if (item) highlight(slotOf(item));
+});
+document.addEventListener('dragend', () => {
+  dragging = null;
+  highlight(null);
+  document.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+});
+/** target drop yang valid untuk drag saat ini, atau null. */
+function dropTarget(t: HTMLElement): HTMLElement | null {
+  if (!dragging) return null;
+  if (dragging.item) {
+    const slot = t.closest<HTMLElement>('.slot');
+    if (slot) return slot.dataset.slot === slotOf(dragging.item) ? slot : null;
+    return t.closest<HTMLElement>('.stage-wrap');
+  }
+  return t.closest<HTMLElement>('.bag, .bag-head, .hint');
+}
+document.addEventListener('dragover', (e) => {
+  const target = dropTarget(e.target as HTMLElement);
+  document.querySelectorAll('.drag-over').forEach((el) => el !== target && el.classList.remove('drag-over'));
+  if (!target) return;
+  e.preventDefault();
+  e.dataTransfer!.dropEffect = 'move';
+  target.classList.add('drag-over');
+});
+document.addEventListener('drop', (e) => {
+  const target = dropTarget(e.target as HTMLElement);
+  if (!target || !dragging) return;
+  e.preventDefault();
+  target.classList.remove('drag-over');
+  highlight(null);
+  if (dragging.item) {
+    selected = dragging.item;
+    equip(dragging.item);
+  } else if (dragging.fromSlot) {
+    unequip(dragging.fromSlot);
+  }
+});
+
 function setAura(slot: string, aura: AuraKey | null) {
   if (aura) state.auras[slot] = new RuneEmitter(AURAS[aura]);
   else delete state.auras[slot];
   if (aura) lo.auras[slot] = aura;
   else delete lo.auras[slot];
 }
-if (!reducedMotion) {
-  for (const [slot, aura] of Object.entries(lo.auras)) {
-    setAura(slot, aura);
-    equipEl.querySelector<HTMLSelectElement>(`select[data-aura="${slot}"]`)!.value = aura;
-  }
+function setRune(r: RuneKey | null) {
+  lo.rune = r;
+  state.rune = r && !reducedMotion ? new RuneEmitter(RUNES[r]) : null;
 }
-equipEl.addEventListener('change', (e) => {
-  const sel = (e.target as HTMLElement).closest<HTMLSelectElement>('select[data-aura]');
-  if (!sel) return;
-  const slot = sel.dataset.aura!;
-  setAura(slot, (sel.value || null) as AuraKey | null);
-  save();
-  draw();
-});
-equipEl.addEventListener('click', (e) => {
-  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-slot]');
-  if (!b) return;
-  const slot = b.dataset.slot!;
-  state.equip[slot] = b.dataset.layer || null;
-  save();
-  equipEl.querySelectorAll<HTMLButtonElement>(`[data-slot="${slot}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  draw();
-});
+if (!reducedMotion) for (const [slot, aura] of Object.entries(lo.auras)) setAura(slot, aura);
+setRune(lo.rune);
+view.setLook(look());
+renderFilter();
+renderSlots();
+renderBag();
+renderDetail();
 
-// Material blade: ganti tabel glyph/warna part "blade" saja, tanpa re-bake.
-// Pewarna: part → key palet. Sama seperti material blade, hanya tabel warna yang dibangun ulang.
-const applyLook = () => view.setLook({ parts: file.parts, ramp: file.ramp, materials: materialsFor(file, lo) });
-applyLook();
-const dyeEl = $<HTMLElement>('#dye');
-for (const [part, d] of Object.entries(DYEABLE)) {
-  if (!file.parts.includes(part)) continue;
-  const swatches = Object.entries(d.palette)
-    .map(([k, m]) => `<button class="swatch" data-dye="${part}" data-key="${k}" aria-pressed="${k === lo.dye[part]}" aria-label="${d.label}: ${m.label}" title="${m.label}" style="--c:${m.colors[1]}"></button>`)
-    .join('');
-  dyeEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${d.label}</span><div class="row" role="group" aria-label="Warna ${d.label}">${swatches}</div>`);
-}
-dyeEl.addEventListener('click', (e) => {
-  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-dye]');
-  if (!b) return;
-  const part = b.dataset.dye!;
-  lo.dye[part] = b.dataset.key!;
-  save();
-  dyeEl.querySelectorAll<HTMLButtonElement>(`[data-dye="${part}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  applyLook();
-  paint();
-});
-const bladeEl = $<HTMLElement>('#blade');
-if (file.parts.includes('blade')) {
-  for (const k of BLADE_MATERIALS) bladeEl.insertAdjacentHTML('beforeend', `<button data-blade="${k}" aria-pressed="${k === lo.blade}">${MATERIALS[k].label}</button>`);
-} else {
-  bladeEl.innerHTML = '<span class="muted">Model ini tanpa blade.</span>';
-}
 $<HTMLInputElement>('#sockets').addEventListener('change', (e) => {
   state.sockets = (e.target as HTMLInputElement).checked;
   draw();
@@ -143,19 +327,6 @@ const setClip = bindGroup('clip', (v) => {
 });
 const setDir = bindGroup('dir', (v) => setYaw(v === file.facing ? SIDE : -SIDE));
 bindGroup('mode', (v) => (state.mode = v as ColorMode));
-const setRune = bindGroup('rune', (v) => {
-  lo.rune = v === 'none' ? null : (v as RuneKey);
-  save();
-  // Partikel = animasi, jadi mati total saat reduced-motion.
-  state.rune = v === 'none' || reducedMotion ? null : new RuneEmitter(RUNES[v as RuneKey]);
-  $<HTMLElement>('#rune-note').hidden = !(reducedMotion && v !== 'none');
-});
-bindGroup('blade', (v) => {
-  lo.blade = v as MaterialKey;
-  save();
-  applyLook();
-});
-
 const playBtn = $<HTMLButtonElement>('#play');
 const syncPlay = () => {
   playBtn.textContent = state.playing ? 'Pause' : 'Play';
@@ -262,7 +433,6 @@ function tick(now: number) {
   }
   requestAnimationFrame(tick);
 }
-if (lo.rune) setRune(lo.rune);
 draw();
 requestAnimationFrame(tick);
 

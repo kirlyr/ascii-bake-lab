@@ -10,8 +10,8 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 ## Keputusan yang sudah final (jangan dibuka ulang tanpa alasan kuat)
 - Stack: Vite + vanilla TS, ASCII langsung ke DOM/canvas, tanpa framework UI. Desktop dulu.
 - Struktur: intro ASCII → Character (Home), Quest Log (Work), Lore (About), Tavern (Play), Send a raven (Contact),
-  plus Recruiter mode. Tavern dikerjakan setelah Home dan Quest Log. Forge (3–4 material, 2–3 rune partikel) ada
-  di Tavern; tanpa inventory grid/stats. Main quest: Pokecrut (tanpa aset Pokémon).
+  plus Recruiter mode. Tavern dikerjakan setelah Home dan Quest Log. Forge (4 material, 5 rune partikel) ada
+  di Tavern; inventory (paper doll + bag + drag & drop) ya, stats tidak (diubah user 2026-11-27). Main quest: Pokecrut (tanpa aset Pokémon).
 - Palet: latar `#120e0a`, panel `#1b1510`, border `#4a3b2a`, teks `#ead9b5`, muted `#b0a083`, aksen `#d4a64a`,
   merah `#d8644c`, hijau `#8fae6a`. Animasi mati saat `prefers-reduced-motion`.
 - Karakter: bake per layer (badan/helm/armor/senjata/pet), tiap sel = shade level + part id + depth (bukan char
@@ -43,6 +43,8 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   hero.bake 195 KB, hero-turn.bake 195 KB (dari 280/270 KB JSON gzip). JSON tidak lagi di-commit. (2026-11-27)
 - Loadout (2026-11-27, user minta): kustomisasi di Tavern disimpan di localStorage pengunjung dan otomatis dipakai
   Home (`src/shared/loadout.ts`, prototype `/home.html`, hanya `hero.bake`).
+- Tavern inventory (2026-11-27, user minta, referensi screenshot inventory ansenjeo): paper doll + bag ikon +
+  drag & drop + panel detail (deskripsi English, tanpa stats). Rune 5. UI Tavern berbahasa Inggris.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)

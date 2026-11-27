@@ -103,6 +103,21 @@ sel kosong atau layer lain), bukan di socket blade. Compose kini mencatat layer 
 `edgeCells()` mengambil tepinya tiap frame. Tanpa bake ulang dan tanpa menambah ukuran file. Per slot bisa dipilih
 satu aura: Bara, Suci, Es, Bayangan, Racun (`AURAS` di `runes.ts`). Mati total saat `prefers-reduced-motion`.
 
+## Tavern inventory
+
+Player (`/`) = Tavern wardrobe bergaya inventory game (UI berbahasa Inggris, tanpa stats):
+- **Paper doll**: karakter di tengah (tetap bisa diputar), slot Head/Shoulders/Chest kiri, Weapon/Legs/Feet kanan.
+  Klik slot = bag difilter ke slot itu.
+- **Bag**: semua varian equipment sebagai ikon. Klik = detail, double-click/Enter = pakai/lepas, drag ke slot yang
+  cocok atau ke karakter = pakai, drag slot ke bag = lepas (HTML5 drag & drop, desktop dulu).
+- **Detail item**: nama, jenis, deskripsi lore (`src/shared/items.ts`), lalu opsi yang relevan dengan part item itu:
+  material blade, rune (5: Fire, Lightning, Blood, Venom, Frost), pewarna, aura.
+- **Ikon** dibuat runtime dari layer bake itu sendiri (frame idle pertama, di-crop, `src/shared/icons.ts`), jadi tanpa
+  file tambahan dan ikut pewarna/material. Senjata diputar supaya blade menunjuk ke kanan atas.
+- Kontrol debug (clip, arah, mode warna, socket) ada di panel **Dev**.
+
+![tavern inventory](docs/media/tavern-inventory.png)
+
 ## Loadout (Tavern → Home)
 
 Semua pilihan di player (equipment, pewarna, material blade, aura, rune) disimpan sebagai loadout di `localStorage`

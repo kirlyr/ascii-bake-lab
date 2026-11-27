@@ -1,59 +1,58 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ASCII Player</title>
+  <title>Tavern Wardrobe</title>
   <link rel="stylesheet" href="/src/player/player.css" />
 </head>
 <body>
-  <main>
-    <section class="panel stage-panel">
-      <h1>┤ HERO ├</h1>
-      <canvas id="stage" aria-label="Karakter ASCII animasi"></canvas>
+  <main class="tavern">
+    <section class="panel inventory" aria-labelledby="inv-title">
+      <header class="inv-head">
+        <h1 id="inv-title">┤ HERO · WARDROBE ├</h1>
+        <a href="home.html">Home →</a>
+      </header>
+      <div class="doll">
+        <div class="slot-col" id="slots-l"></div>
+        <div class="stage-wrap">
+          <canvas id="stage" aria-label="ASCII character. Drag sideways to turn, drop an item here to equip it."></canvas>
+          <div class="turn row" id="turn" role="group" aria-label="Turn character">
+            <button id="rot-l" aria-label="Turn left">⟲</button>
+            <span id="yaw" class="muted">-90°</span>
+            <button id="rot-r" aria-label="Turn right">⟳</button>
+          </div>
+        </div>
+        <div class="slot-col" id="slots-r"></div>
+      </div>
+      <div class="bag-head">
+        <h2 id="bag-title">Bag</h2>
+        <div class="row" id="bag-filter" role="group" aria-label="Filter bag"></div>
+      </div>
+      <p class="muted hint">Click an item to inspect · double-click or Enter to equip · drag onto a slot or the hero · drag a worn item back to the bag to take it off</p>
+      <ul id="bag" class="bag" aria-labelledby="bag-title"></ul>
     </section>
-    <section class="panel controls">
-      <h2>Animasi</h2>
+    <aside class="panel detail" id="detail" aria-live="polite"></aside>
+    <details class="panel dev">
+      <summary>Dev</summary>
       <div class="row" role="group" aria-label="Clip">
         <button data-clip="idle" aria-pressed="true">Idle</button>
         <button data-clip="walk" aria-pressed="false">Walk</button>
       </div>
-      <h2>Arah</h2>
-      <div class="row" role="group" aria-label="Arah">
-        <button data-dir="left" aria-pressed="false">← Kiri</button>
-        <button data-dir="right" aria-pressed="true">Kanan →</button>
+      <div class="row" role="group" aria-label="Facing">
+        <button data-dir="left" aria-pressed="false">← Left</button>
+        <button data-dir="right" aria-pressed="true">Right →</button>
       </div>
-      <div id="turn">
-        <h2>Putar <span id="yaw" class="muted">-90°</span></h2>
-        <div class="row" role="group" aria-label="Putar karakter">
-          <button id="rot-l" aria-label="Putar ke kiri">⟲</button>
-          <button id="rot-r" aria-label="Putar ke kanan">⟳</button>
-        </div>
-        <p class="muted">Atau drag karakter. Selain arah samping: idle napas 4 frame.</p>
-      </div>
-      <h2>Equipment</h2>
-      <div id="equip" class="slots"></div>
-      <h2>Pewarna</h2>
-      <div id="dye" class="slots"></div>
-      <h2>Material blade</h2>
-      <div id="blade" class="row" role="group" aria-label="Material blade"></div>
-      <h2>Rune</h2>
-      <div id="rune" class="row" role="group" aria-label="Rune">
-        <button data-rune="none" aria-pressed="true">Tanpa</button>
-        <button data-rune="fire" aria-pressed="false">Api ^</button>
-      </div>
-      <p id="rune-note" class="muted" hidden>Partikel mati karena prefers-reduced-motion.</p>
-      <h2>Warna</h2>
-      <div class="row" role="group" aria-label="Warna">
+      <div class="row" role="group" aria-label="Color mode">
         <button data-mode="material" aria-pressed="true">Material</button>
         <button data-mode="part" aria-pressed="false">Part</button>
         <button data-mode="depth" aria-pressed="false">Depth</button>
       </div>
-      <div class="col"><label><input type="checkbox" id="sockets"> Penanda socket blade</label></div>
+      <label><input type="checkbox" id="sockets"> Blade socket markers</label>
       <div class="row"><button id="play" aria-pressed="true">Pause</button></div>
-      <p class="muted">Tahan ← / → untuk berjalan.</p>
+      <p class="muted">Hold ← / → to walk.</p>
       <p id="info" class="muted"></p>
-    </section>
+    </details>
   </main>
   <script type="module" src="/src/player/main.ts"></script>
 </body>
