@@ -33,10 +33,12 @@ export interface FrameData {
   y: number;
   w: number;
   h: number;
-  /** base64 Uint8Array(w*h). packCell(part, shade). Abaikan kalau depth kosong. */
-  cell: string;
-  /** base64 Uint8Array(w*h). 0..254 = depth, 255 = kosong. */
-  depth: string;
+  /** base64 Uint8Array(w*h). packCell(part, shade). Abaikan kalau depth kosong. Hanya di JSON (output bake mentah). */
+  cell?: string;
+  /** base64 Uint8Array(w*h). 0..254 = depth, 255 = kosong. Hanya di JSON. */
+  depth?: string;
+  /** offset frame ini di plane cell/depth container `.bake` (pengganti cell/depth). */
+  o?: number;
   /** hanya di layer senjata. */
   blade?: BladeSocket;
 }
@@ -101,4 +103,66 @@ export const mirrorChar = (c: string): string => MIRROR_MAP[c] ?? c;
 /** Hasil bake banyak arah (idle napas beberapa frame, untuk memutar karakter). Arah lain = mirror dari salah satu view. */
 export interface TurnFile {
   views: BakeFile[];
+}
+
+// ── Container biner `.bake` ────────────────────────────────────────────────────────────────────────
+// gzip( magic "ASB3" | u32 panjang header | header JSON | plane cell | plane depth ).
+// Header = BakeFile/TurnFile tanpa cell/depth base64; tiap frame punya `o` (offset di plane).
+// Plane dipisah (semua cell dulu, lalu semua depth) karena gzip lebih efektif: ±33% lebih kecil dari JSON.
+// Delta antar frame sudah diuji dan justru lebih besar (karakter bergerak, XOR jadi noise).
+
+const MAGIC = 0x33425341; // "ASB3" little-endian
+
+export interface Planes {
+  cell: Uint8Array;
+  depth: Uint8Array;
+}
+
+function eachFrame(obj: BakeFile | TurnFile, fn: (f: FrameData) => void) {
+  for (const v of 'views' in obj ? obj.views : [obj]) for (const l of Object.values(v.layers)) for (const fs of Object.values(l.clips)) fs.forEach(fn);
+}
+
+/** JSON hasil bake → container biner (belum di-gzip). */
+export function packBake(obj: BakeFile | TurnFile): Uint8Array<ArrayBuffer> {
+  const head = JSON.parse(JSON.stringify(obj)) as BakeFile | TurnFile;
+  const cells: Uint8Array[] = [];
+  const depths: Uint8Array[] = [];
+  let n = 0;
+  eachFrame(head, (f) => {
+    f.o = n;
+    n += f.w * f.h;
+    cells.push(f.w * f.h ? b64decode(f.cell ?? '') : new Uint8Array());
+    depths.push(f.w * f.h ? b64decode(f.depth ?? '') : new Uint8Array());
+    delete f.cell;
+    delete f.depth;
+  });
+  const json = new TextEncoder().encode(JSON.stringify(head));
+  const out = new Uint8Array(8 + json.length + 2 * n);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, MAGIC, true);
+  dv.setUint32(4, json.length, true);
+  out.set(json, 8);
+  let p = 8 + json.length;
+  for (const c of cells) out.set(c, p), (p += c.length);
+  for (const d of depths) out.set(d, p), (p += d.length);
+  return out;
+}
+
+export function unpackBake<T extends BakeFile | TurnFile>(buf: Uint8Array): { data: T; planes: Planes } {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (dv.getUint32(0, true) !== MAGIC) throw new Error('Bukan file .bake (ASB3)');
+  const len = dv.getUint32(4, true);
+  const data = JSON.parse(new TextDecoder().decode(buf.subarray(8, 8 + len))) as T;
+  const rest = buf.subarray(8 + len);
+  const n = rest.length / 2;
+  return { data, planes: { cell: rest.subarray(0, n), depth: rest.subarray(n) } };
+}
+
+/** Muat `.bake` (gzip) tanpa bergantung pada Content-Encoding server. */
+export async function loadBake<T extends BakeFile | TurnFile>(url: string): Promise<{ data: T; planes: Planes; bytes: number } | null> {
+  const res = await fetch(url);
+  if (!res.ok || !res.body) return null;
+  const bytes = Number(res.headers.get('content-length') ?? 0);
+  const raw = new Uint8Array(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  return { ...unpackBake<T>(raw), bytes };
 }

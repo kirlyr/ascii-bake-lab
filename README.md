@@ -14,11 +14,11 @@ npm run dev
 ```
 
 - `http://localhost:5173/bake.html` → **bake tool** (dev only, pakai Three.js). Atur parameter, klik **Bake**, lalu
-  **Simpan ke public/baked/hero.json** (endpoint dev di `vite.config.ts`) atau **Download JSON**.
+  **Simpan ke public/baked/hero.bake** (endpoint dev di `vite.config.ts`, gzip level 9) atau **Download JSON** (debug).
 - `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), equipment per slot, aura per slot, putar 16 arah,
   material blade (Iron/Steel/Gold/Bloodiron), rune api, mode warna Material/Part/Depth, penanda socket blade.
   Tahan ← / → untuk berjalan.
-- `npm run build` hanya mem-build player. Hasil saat ini: JS 11,5 KB (5,3 KB gzip), Three.js tidak ikut.
+- `npm run build` hanya mem-build player + `home.html`. Three.js tidak ikut.
 
 ## Cara kerja bake
 
@@ -41,7 +41,12 @@ npm run dev
      supaya gzip lebih kecil.
 4. Layer senjata juga menyimpan **socket blade** per frame: `base` (titik potong hilt/blade) dan `tip`, dalam koordinat
    grid `[x, y, depth]`. Dipakai emitter partikel rune.
-5. Frame di-crop ke bounding box sel terisi. Satu byte per sel `part * 16 + shade` + satu byte depth, base64.
+5. Frame di-crop ke bounding box sel terisi. Satu byte per sel `part * 16 + shade` + satu byte depth.
+6. Disimpan sebagai container biner `.bake` (`packBake` di `format.ts`): gzip( magic `ASB3` | panjang header |
+   header JSON | plane cell | plane depth ). Header = BakeFile/TurnFile tanpa data frame; tiap frame punya offset `o`.
+   Semua cell dulu lalu semua depth, karena gzip lebih efektif begitu. Player memuat lewat `DecompressionStream`,
+   jadi tidak bergantung pada Content-Encoding server. Delta antar frame sudah diuji dan justru lebih besar
+   (karakter bergerak, XOR jadi noise), jadi tidak dipakai.
 
 Format lengkap: `src/shared/format.ts` (BakeFile v2). File v1 (char final) tidak didukung lagi.
 
@@ -81,6 +86,16 @@ forge + sumber socket rune), kayu tetap `wood`. Gada: paku + cincin kepala; Palu
 Kapak/Tombak/Sabit: mata senjata. Tombak dipegang tegak supaya grid tidak melebar 2 m ke depan; Kapak dan Sabit
 diputar (`spin`) supaya sisi lebar mata senjata menghadap kamera. Pose genggam tetap satu tangan (pose `Sword_Idle`).
 
+## Pewarna
+
+Kain, kulit samak, linen, wol, pelat bahu, helm, dan hiasan bisa diwarnai dari player (`DYEABLE` di `materials.ts`).
+Pewarna hanya mengganti stop warna material (glyph tetap dari ramp bake), jadi tanpa bake ulang. Kain/kulit memakai
+9 warna `DYES` (Lumut, Darah, Nila, Ungu bangsawan, Oker, Samak, Coklat wol, Perkamen, Arang), logam memakai 5
+`FINISHES` (Besi, Baja, Perunggu, Emas, Hitam). Berlaku per part, jadi semua item dengan part yang sama ikut berubah
+(mis. kain rompi dan celana Ranger).
+
+![pewarna](docs/media/dyes.png)
+
 ## Aura
 
 Aura = partikel glyph seperti rune, tapi lahir di **tepi silhouette item** (sel milik layer itu yang bertetangga dengan
@@ -88,15 +103,25 @@ sel kosong atau layer lain), bukan di socket blade. Compose kini mencatat layer 
 `edgeCells()` mengambil tepinya tiap frame. Tanpa bake ulang dan tanpa menambah ukuran file. Per slot bisa dipilih
 satu aura: Bara, Suci, Es, Bayangan, Racun (`AURAS` di `runes.ts`). Mati total saat `prefers-reduced-motion`.
 
+## Loadout (Tavern → Home)
+
+Semua pilihan di player (equipment, pewarna, material blade, aura, rune) disimpan sebagai loadout di `localStorage`
+pengunjung (`src/shared/loadout.ts`, key `ascii-hero-loadout`) dan langsung dipulihkan saat halaman dibuka lagi.
+`/home.html` (prototype Home) hanya memuat `hero.bake`, sudut samping, idle, tanpa kontrol, dan memakai loadout yang
+sama. Jadi player = Tavern = tempat kustomisasi karakter Home. Nilai yang tidak dikenal lagi (layer dihapus, palet
+diganti) jatuh ke default bake. Tiap pengunjung punya loadout sendiri; tanpa loadout tersimpan = susunan default.
+
+![home dengan loadout](docs/media/home-loadout.png)
+
 ## Memutar karakter (16 arah, idle napas)
 
 Preset `hero-turn` (`/bake.html?model=hero-turn`) mem-bake **4 frame idle** (merata sepanjang clip, `stillFrames: 4`) dari 9 arah (`views`: 0°, −22,5° … −180°),
-semua layer equipment, ke `public/baked/hero-turn.json` (`TurnFile`). 7 arah lainnya = mirror. Semua arah berbagi
+semua layer equipment, ke `public/baked/hero-turn.bake` (`TurnFile`). 7 arah lainnya = mirror. Semua arah berbagi
 framing, rentang depth, dan auto-level; grid dipusatkan ke origin model supaya karakter tidak bergeser saat diputar.
 
-Player: drag karakter atau tombol ⟲ ⟳ (per 22,5°). Arah samping (±90°) memakai `hero.json` yang beranimasi
+Player: drag karakter atau tombol ⟲ ⟳ (per 22,5°). Arah samping (±90°) memakai `hero.bake` yang beranimasi
 (idle/walk); arah lain memutar 4 frame idle itu (±1,6 fps, satu siklus napas 2,5 detik). Kedua file disejajarkan lewat `origin` (titik antara kaki, di grid) yang kini
-disimpan tiap BakeFile. Di portfolio, `hero-turn.json` cukup dimuat di Tavern.
+disimpan tiap BakeFile. Di portfolio, `hero-turn.bake` cukup dimuat di Tavern.
 
 ![16 arah, ditampilkan 8](docs/media/turn.png)
 
@@ -145,22 +170,23 @@ Perbaikan karakter (PR #5):
 | | |
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
-| `hero.json` | 2,9 MB mentah / **280 KB gzip** (badan 45 KB; outfit 14–24 KB per bagian; helm 2–4 KB; senjata 5–17 KB) |
-| `hero-turn.json` | 9 arah × 22 layer × 4 frame = **270 KB gzip** (pose diam 1 frame: 107 KB) |
+| `hero.bake` | **195 KB** (JSON base64 + gzip sebelumnya: 280 KB) |
+| `hero-turn.bake` | 9 arah × 22 layer × 4 frame = **195 KB** (JSON sebelumnya: 270 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan
-`hero-turn.json` hanya di Tavern. Kalau masih terasa berat: file per layer yang dimuat saat dipilih.
+`hero-turn.bake` hanya di Tavern. Kalau masih terasa berat: file per layer yang dimuat saat dipilih.
 
-Ruang optimasi lain yang belum dikerjakan: format biner tanpa base64 (uji: ±130 KB gzip), delta antar frame, fps 8–10.
+Ruang optimasi lain yang belum dikerjakan: fps 8–10, file per layer (lazy).
 
 ## Struktur
 
 ```
 bake.html, src/bake/        bake tool (Three.js, dev only)
 index.html, src/player/     player (produksi)
-src/shared/                 format JSON, compose, renderer canvas (tanpa Three.js)
-public/baked/hero.json      hasil bake
+home.html, src/home/        prototype Home: karakter dengan loadout dari Tavern
+src/shared/                 format .bake, compose, loadout, renderer canvas (tanpa Three.js)
+public/baked/*.bake         hasil bake (container biner gzip)
 assets/models/quaternius*/  model CC0 + SOURCE.md
 docs/PLAN.md                rencana portfolio lengkap
 ```

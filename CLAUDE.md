@@ -15,7 +15,7 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Palet: latar `#120e0a`, panel `#1b1510`, border `#4a3b2a`, teks `#ead9b5`, muted `#b0a083`, aksen `#d4a64a`,
   merah `#d8644c`, hijau `#8fae6a`. Animasi mati saat `prefers-reduced-motion`.
 - Karakter: bake per layer (badan/helm/armor/senjata/pet), tiap sel = shade level + part id + depth (bukan char
-  final, supaya material bisa di-swap di runtime; sudah diimplementasi, format v2), compose runtime pilih
+  final, supaya material bisa di-swap di runtime; sudah diimplementasi, format v2, disimpan sebagai `.bake`), compose runtime pilih
   depth terdekat. Satu sudut kamera samping, arah sebaliknya = mirror. v1: 2–3 varian per slot.
 - Proporsi karakter **realistis, bukan chibi** (seperti referensi IG ansenjeo), tinggi ±90 baris, font kecil supaya rapat.
 - Three.js hanya di bake tool (dev). Build produksi tidak boleh membawa Three.js.
@@ -34,16 +34,20 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - PR #6 equipment: varian per slot (3 helm, 4 senjata termasuk Gada, armor bisa dilepas), tiap varian = layer bake
   dengan `slot`, UI pilih/lepas di player. Forge (material + rune) jalan di semua senjata.
 - Putar karakter (dipilih user 2026-11-26): 16 arah; 2026-11-27 user minta napas → **4 frame idle per arah**
-  (`hero-turn.json` 270 KB gzip), arah samping tetap beranimasi penuh dari `hero.json`. Untuk Tavern; Home tetap sudut samping.
+  (`hero-turn.bake`), arah samping tetap beranimasi penuh dari `hero.json`. Untuk Tavern; Home tetap sudut samping.
 - Wardrobe (2026-11-27, user minta): outfit dipecah ke slot baju/celana/sepatu/bahu (Ranger + Peasant + ShoulderPads),
   helm 5 (termasuk 2 mahkota), senjata 8 (tambah kapak, tombak, palu, sabit dari Modular Weapons Pack CC0), aura per
-  slot (partikel di tepi silhouette, runtime). hero.json 280 KB gzip. Robe/plate armor
+  slot (partikel di tepi silhouette, runtime). Robe/plate armor
   butuh pack Quaternius berbayar (diunduh user dari laptop). Tombak/kapak dua tangan belum punya pose sendiri.
+- Pewarna per part (kain, kulit, linen, wol, pelat, helm, hiasan) + format biner `.bake` (gzip, plane cell/depth):
+  hero.bake 195 KB, hero-turn.bake 195 KB (dari 280/270 KB JSON gzip). JSON tidak lagi di-commit. (2026-11-27)
+- Loadout (2026-11-27, user minta): kustomisasi di Tavern disimpan di localStorage pengunjung dan otomatis dipakai
+  Home (`src/shared/loadout.ts`, prototype `/home.html`, hanya `hero.bake`).
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
 1. ~~Varian helm/senjata (2–3 per slot).~~ Selesai (PR equipment).
-2. Optimasi format output jika perlu (biner + delta).
+2. ~~Optimasi format output (biner).~~ Selesai; delta antar frame diuji, lebih besar, tidak dipakai.
 3. Buat repo portfolio, pindahkan bake tool, mulai dari intro + Character (Home).
 
 ## Aturan kerja user
@@ -55,5 +59,5 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Repo private, tetap jangan simpan data pribadi (nomor telepon, alamat, dsb.) di repo.
 
 ## Perintah
-- `npm run dev` → player di `/`, bake tool di `/bake.html`
-- `npm run build` → type check + build player saja
+- `npm run dev` → player/Tavern di `/`, Home di `/home.html`, bake tool di `/bake.html`
+- `npm run build` → type check + build player + home saja

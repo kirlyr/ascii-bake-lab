@@ -1,29 +1,28 @@
-// Player produksi: memutar JSON hasil bake sebagai teks di canvas. Tanpa Three.js.
-import type { BakeFile, TurnFile } from '../shared/format';
-import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment, type Sprite } from '../shared/compose';
+// Player produksi: memutar hasil bake (.bake) sebagai teks di canvas. Tanpa Three.js.
+import { loadBake, type BakeFile, type TurnFile } from '../shared/format';
+import { activeLayers, composeFrame, createGrid, decodeSprite, type Sprite } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
 import { AURAS, RUNES, RuneEmitter, alongBlade, alongEdge, type AuraKey, type RuneKey, type Spawn } from '../shared/runes';
-import { BLADE_MATERIALS, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
+import { BLADE_MATERIALS, DYEABLE, MATERIALS, type MaterialKey } from '../shared/materials';
+import { loadLoadout, materialsFor, saveLoadout } from '../shared/loadout';
 
 const MODEL = new URLSearchParams(location.search).get('model') ?? 'hero';
-const URL_JSON = `${import.meta.env.BASE_URL}baked/${MODEL}.json`;
+const URL_BAKE = `${import.meta.env.BASE_URL}baked/${MODEL}.bake`;
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const info = $<HTMLElement>('#info');
 $<HTMLElement>('h1').textContent = `┤ ${MODEL.toUpperCase()} ├`;
 
-// `<model>-turn.json` (opsional) = 16 arah idle napas (4 frame) untuk memutar karakter. Di portfolio cukup dimuat di Tavern.
-const [text, turnText] = await Promise.all([
-  fetch(URL_JSON).then((r) => r.text()),
-  fetch(URL_JSON.replace(/\.json$/, '-turn.json')).then((r) => (r.ok ? r.text() : null)),
-]);
-const file = JSON.parse(text) as BakeFile;
-const turn = turnText ? (JSON.parse(turnText) as TurnFile) : null;
+// `<model>-turn.bake` (opsional) = 16 arah idle napas (4 frame) untuk memutar karakter. Di portfolio cukup dimuat di Tavern.
+const [main, turnBake] = await Promise.all([loadBake<BakeFile>(URL_BAKE), loadBake<TurnFile>(URL_BAKE.replace(/\.bake$/, '-turn.bake'))]);
+if (!main) throw new Error(`${URL_BAKE} tidak ada. Bake dulu lewat /bake.html.`);
+const file = main.data;
+const turn = turnBake?.data ?? null;
 await document.fonts.load('700 10px "JetBrains Mono"');
 
-const sprite = decodeSprite(file);
+const sprite = decodeSprite(file, main.planes);
 // yaw view (0..-180) → sprite. Arah +yaw = mirror dari -yaw.
-const turnViews = new Map<number, Sprite>((turn?.views ?? []).map((v) => [v.yaw ?? 0, decodeSprite(v)]));
+const turnViews = new Map<number, Sprite>((turn?.views ?? []).map((v) => [v.yaw ?? 0, decodeSprite(v, turnBake!.planes)]));
 // Grid cukup lebar untuk semua arah; tiap file disejajarkan lewat origin (titik antara kaki).
 const cols = Math.max(file.cols, ...(turn?.views ?? []).map((v) => v.cols));
 const grid = createGrid(cols, file.rows);
@@ -32,14 +31,16 @@ view.resize(cols, file.rows);
 const SIDE = file.facing === 'right' ? -90 : 90;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Kustomisasi di sini (Tavern) disimpan sebagai loadout, Home memakai loadout yang sama.
+const lo = loadLoadout(file);
+const save = () => saveLoadout(lo);
 const state = {
   clip: 'idle',
   /** arah kamera (derajat, kelipatan 22,5). -90 = hadap kanan, 90 = hadap kiri, 0 = depan. */
   yaw: SIDE,
   mode: 'material' as ColorMode,
-  blade: 'iron' as MaterialKey,
   sockets: false,
-  equip: defaultEquipment(file),
+  equip: lo.equip,
   playing: !reducedMotion,
   rune: null as RuneEmitter | null,
   /** aura per slot; partikel lahir di tepi silhouette item yang dipasang di slot itu. */
@@ -63,12 +64,24 @@ for (const slot of Object.keys(state.equip)) {
   const aura = reducedMotion ? '' : `<select data-aura="${slot}" aria-label="Aura ${name}">${auraOptions}</select>`;
   equipEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${name} ${aura}</span><div class="row" role="group" aria-label="${name}">${buttons}</div>`);
 }
+function setAura(slot: string, aura: AuraKey | null) {
+  if (aura) state.auras[slot] = new RuneEmitter(AURAS[aura]);
+  else delete state.auras[slot];
+  if (aura) lo.auras[slot] = aura;
+  else delete lo.auras[slot];
+}
+if (!reducedMotion) {
+  for (const [slot, aura] of Object.entries(lo.auras)) {
+    setAura(slot, aura);
+    equipEl.querySelector<HTMLSelectElement>(`select[data-aura="${slot}"]`)!.value = aura;
+  }
+}
 equipEl.addEventListener('change', (e) => {
   const sel = (e.target as HTMLElement).closest<HTMLSelectElement>('select[data-aura]');
   if (!sel) return;
   const slot = sel.dataset.aura!;
-  if (sel.value) state.auras[slot] = new RuneEmitter(AURAS[sel.value as AuraKey]);
-  else delete state.auras[slot];
+  setAura(slot, (sel.value || null) as AuraKey | null);
+  save();
   draw();
 });
 equipEl.addEventListener('click', (e) => {
@@ -76,16 +89,36 @@ equipEl.addEventListener('click', (e) => {
   if (!b) return;
   const slot = b.dataset.slot!;
   state.equip[slot] = b.dataset.layer || null;
+  save();
   equipEl.querySelectorAll<HTMLButtonElement>(`[data-slot="${slot}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   draw();
 });
 
 // Material blade: ganti tabel glyph/warna part "blade" saja, tanpa re-bake.
-const applyLook = () => view.setLook({ parts: file.parts, ramp: file.ramp, materials: lookFor(file.parts, { blade: state.blade }) });
+// Pewarna: part → key palet. Sama seperti material blade, hanya tabel warna yang dibangun ulang.
+const applyLook = () => view.setLook({ parts: file.parts, ramp: file.ramp, materials: materialsFor(file, lo) });
 applyLook();
+const dyeEl = $<HTMLElement>('#dye');
+for (const [part, d] of Object.entries(DYEABLE)) {
+  if (!file.parts.includes(part)) continue;
+  const swatches = Object.entries(d.palette)
+    .map(([k, m]) => `<button class="swatch" data-dye="${part}" data-key="${k}" aria-pressed="${k === lo.dye[part]}" aria-label="${d.label}: ${m.label}" title="${m.label}" style="--c:${m.colors[1]}"></button>`)
+    .join('');
+  dyeEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${d.label}</span><div class="row" role="group" aria-label="Warna ${d.label}">${swatches}</div>`);
+}
+dyeEl.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-dye]');
+  if (!b) return;
+  const part = b.dataset.dye!;
+  lo.dye[part] = b.dataset.key!;
+  save();
+  dyeEl.querySelectorAll<HTMLButtonElement>(`[data-dye="${part}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  applyLook();
+  paint();
+});
 const bladeEl = $<HTMLElement>('#blade');
 if (file.parts.includes('blade')) {
-  for (const k of BLADE_MATERIALS) bladeEl.insertAdjacentHTML('beforeend', `<button data-blade="${k}" aria-pressed="${k === state.blade}">${MATERIALS[k].label}</button>`);
+  for (const k of BLADE_MATERIALS) bladeEl.insertAdjacentHTML('beforeend', `<button data-blade="${k}" aria-pressed="${k === lo.blade}">${MATERIALS[k].label}</button>`);
 } else {
   bladeEl.innerHTML = '<span class="muted">Model ini tanpa blade.</span>';
 }
@@ -110,13 +143,16 @@ const setClip = bindGroup('clip', (v) => {
 });
 const setDir = bindGroup('dir', (v) => setYaw(v === file.facing ? SIDE : -SIDE));
 bindGroup('mode', (v) => (state.mode = v as ColorMode));
-bindGroup('rune', (v) => {
+const setRune = bindGroup('rune', (v) => {
+  lo.rune = v === 'none' ? null : (v as RuneKey);
+  save();
   // Partikel = animasi, jadi mati total saat reduced-motion.
   state.rune = v === 'none' || reducedMotion ? null : new RuneEmitter(RUNES[v as RuneKey]);
   $<HTMLElement>('#rune-note').hidden = !(reducedMotion && v !== 'none');
 });
 bindGroup('blade', (v) => {
-  state.blade = v as MaterialKey;
+  lo.blade = v as MaterialKey;
+  save();
   applyLook();
 });
 
@@ -226,8 +262,10 @@ function tick(now: number) {
   }
   requestAnimationFrame(tick);
 }
+if (lo.rune) setRune(lo.rune);
 draw();
 requestAnimationFrame(tick);
 
 const frames = Object.values(file.layers).reduce((n, l) => n + Object.values(l.clips).reduce((m, f) => m + f.length, 0), 0);
-info.textContent = `${file.cols}×${file.rows} sel · ${file.fps} fps · ${frames} frame total · ${(text.length / 1024).toFixed(0)} KB JSON (sebelum gzip)`;
+info.textContent = `${file.cols}×${file.rows} sel · ${file.fps} fps · ${frames} frame total · ` +
+  [main, turnBake].filter((b) => b?.bytes).map((b, i) => ` · ${i ? 'turn' : 'hero'} ${(b!.bytes / 1024).toFixed(0)} KB`).join('');

@@ -1,6 +1,6 @@
 // Runtime compose: tumpuk beberapa layer per sel berdasarkan depth terdekat (dikurangi bias layer).
 // Tanpa Three.js. Dipakai player dan preview di bake tool.
-import { b64decode, EMPTY_DEPTH, type BakeFile, type BladeSocket } from './format';
+import { b64decode, EMPTY_DEPTH, type BakeFile, type BladeSocket, type Planes } from './format';
 
 export interface DecodedFrame {
   x: number;
@@ -34,13 +34,18 @@ export interface Grid {
   layers: string[];
 }
 
-export function decodeSprite(file: BakeFile): Sprite {
+/** `planes` = plane dari container `.bake` (frame punya `o`); tanpa itu, frame dibaca dari base64 JSON. */
+export function decodeSprite(file: BakeFile, planes?: Planes): Sprite {
   if (file.version !== 2) throw new Error(`Format bake v${file.version} tidak didukung. Bake ulang dengan bake tool.`);
   const layers: Sprite['layers'] = {};
   for (const [lk, layer] of Object.entries(file.layers)) {
     layers[lk] = {};
     for (const [ck, frames] of Object.entries(layer.clips)) {
-      layers[lk][ck] = frames.map((f) => ({ ...f, cell: b64decode(f.cell), depth: b64decode(f.depth) }));
+      layers[lk][ck] = frames.map((f) => {
+        const n = f.w * f.h;
+        if (planes && f.o !== undefined) return { ...f, cell: planes.cell.subarray(f.o, f.o + n), depth: planes.depth.subarray(f.o, f.o + n) };
+        return { ...f, cell: b64decode(f.cell ?? ''), depth: b64decode(f.depth ?? '') };
+      });
     }
   }
   return { file, layers };

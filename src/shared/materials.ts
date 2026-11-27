@@ -54,5 +54,46 @@ export const DEFAULT_LOOK: Record<string, MaterialKey> = {
   trim: 'brass',
 };
 
-export const lookFor = (parts: string[], overrides: Record<string, MaterialKey> = {}): Record<string, Material> =>
-  Object.fromEntries(parts.map((p) => [p, MATERIALS[overrides[p] ?? DEFAULT_LOOK[p] ?? 'plate']]));
+/**
+ * Pewarna: hanya stop warna, glyph tetap dari ramp bake (bentuk dan tepi tidak berubah).
+ * Kain dan kulit pakai DYES, logam pakai FINISHES. Berlaku per part, jadi semua item dengan part itu ikut.
+ */
+export const DYES = {
+  moss: { label: 'Lumut', colors: ['#34402a', '#6f8a4c', '#b4cc8a'] },
+  crimson: { label: 'Darah', colors: ['#4a1410', '#a83a2a', '#f08a6c'] },
+  indigo: { label: 'Nila', colors: ['#1e2440', '#4a5a98', '#a8b4e0'] },
+  royal: { label: 'Ungu bangsawan', colors: ['#2e1a3a', '#6e4a8a', '#c8a8e0'] },
+  ochre: { label: 'Oker', colors: ['#4a3410', '#b08030', '#f0d08a'] },
+  tan: { label: 'Samak', colors: ['#4e3220', '#946038', '#d8a870'] },
+  brown: { label: 'Coklat wol', colors: ['#3e3024', '#7a6048', '#c0a080'] },
+  parchment: { label: 'Perkamen', colors: ['#4e4432', '#a89870', '#ead9b5'] },
+  charcoal: { label: 'Arang', colors: ['#2a2622', '#5a544c', '#b0a898'] },
+} satisfies Record<string, Material>;
+
+export const FINISHES = {
+  iron: { label: 'Besi', colors: ['#4a4238', '#9a8f7c', '#ead9b5'] },
+  steel: { label: 'Baja', colors: ['#34404c', '#90a4b8', '#eef4fa'] },
+  bronze: { label: 'Perunggu', colors: ['#4a2e14', '#b07a40', '#f0c890'] },
+  gold: { label: 'Emas', colors: ['#5a3e10', '#d4a64a', '#f6dc8c'] },
+  black: { label: 'Hitam', colors: ['#2a2626', '#5a5450', '#b0a8a0'] },
+} satisfies Record<string, Material>;
+
+/** Part yang bisa diwarnai: palet + warna awal (sama dengan DEFAULT_LOOK). */
+export const DYEABLE: Record<string, { label: string; palette: Record<string, Material>; initial: string }> = {
+  cloth: { label: 'Kain', palette: DYES, initial: 'moss' },
+  leather: { label: 'Kulit samak', palette: DYES, initial: 'tan' },
+  linen: { label: 'Linen', palette: DYES, initial: 'parchment' },
+  wool: { label: 'Wol', palette: DYES, initial: 'brown' },
+  armor: { label: 'Pelat bahu', palette: FINISHES, initial: 'iron' },
+  helmet: { label: 'Helm', palette: FINISHES, initial: 'iron' },
+  trim: { label: 'Hiasan', palette: FINISHES, initial: 'gold' },
+};
+
+/** Material per part. `overrides` = key MATERIALS atau Material langsung (pewarna). */
+export const lookFor = (parts: string[], overrides: Record<string, MaterialKey | Material> = {}): Record<string, Material> =>
+  Object.fromEntries(
+    parts.map((p) => {
+      const o = overrides[p];
+      return [p, typeof o === 'object' ? o : MATERIALS[o ?? DEFAULT_LOOK[p] ?? 'plate']];
+    }),
+  );
