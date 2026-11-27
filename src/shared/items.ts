@@ -35,7 +35,7 @@ export const ITEMS: Record<string, ItemText> = {
   ranger_pauldron: { name: 'Ranger Pauldron', kind: 'shoulders · plate', desc: 'A single plate on the bow arm. Turns a stray arrow, not much more.' },
   knight_pads: { name: 'Knight Pauldrons', kind: 'shoulders · plate', desc: 'Twin plates from the old guard armory. Heavy, loud and very reassuring.' },
   cloak: { name: 'Wanderer Cloak', kind: 'back · wool', desc: 'Heavy wool, frayed at the hem. Keeps off the rain, the cold, and most questions.' },
-  wings: { name: 'Feathered Wings', kind: 'back · feather', desc: 'Pinions of a fallen guardian. They do not lift you, but every tavern goes quiet.' },
+  wings: { name: 'Fallen Wings', kind: 'back · feather', desc: 'Folded pinions of a fallen guardian, torn at the edges. They do not lift you, but every tavern goes quiet.' },
   helmet1: { name: 'Iron Helm', kind: 'head · plate', desc: 'Hammered from one sheet of iron. Dented, but never broken.' },
   helmet2: { name: 'Knight Helm', kind: 'head · plate', desc: 'Closed visor, narrow sight. The knight sees little, and fears less.' },
   helmet3: { name: 'Noble Helm', kind: 'head · plate & gold', desc: 'Gilded crest of a house nobody remembers. The gold is still real.' },
