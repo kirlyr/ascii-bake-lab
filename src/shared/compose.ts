@@ -28,6 +28,10 @@ export interface Grid {
   mirror: boolean;
   /** socket blade frame ini (sudah di-mirror), kalau layer senjata aktif. */
   blade: BladeSocket | null;
+  /** layer pemilik tiap sel: index ke `layers` + 1 (0 = kosong). Sumber aura. */
+  owner: Uint8Array;
+  /** layer aktif frame ini, urutan sama dengan `owner`. */
+  layers: string[];
 }
 
 export function decodeSprite(file: BakeFile): Sprite {
@@ -60,7 +64,8 @@ export function activeLayers(file: BakeFile, eq: Equipment): string[] {
 }
 
 export function createGrid(cols: number, rows: number): Grid {
-  return { cols, rows, cell: new Uint8Array(cols * rows), depth: new Uint8Array(cols * rows), mirror: false, blade: null };
+  const n = cols * rows;
+  return { cols, rows, cell: new Uint8Array(n), depth: new Uint8Array(n), mirror: false, blade: null, owner: new Uint8Array(n), layers: [] };
 }
 
 /** Tulis satu frame (semua layer aktif) ke grid. `mirror` membalik arah hadap. */
@@ -68,8 +73,10 @@ export function composeFrame(sprite: Sprite, grid: Grid, clip: string, frame: nu
   grid.depth.fill(EMPTY_DEPTH);
   grid.mirror = mirror;
   grid.blade = null;
+  grid.owner.fill(0);
+  grid.layers = activeLayers;
   const { cols } = sprite.file;
-  for (const lk of activeLayers) {
+  for (const [li, lk] of activeLayers.entries()) {
     const frames = sprite.layers[lk]?.[clip];
     if (!frames?.length) continue;
     const f = frames[frame % frames.length];
@@ -92,7 +99,26 @@ export function composeFrame(sprite: Sprite, grid: Grid, clip: string, frame: nu
         if (d >= grid.depth[gi]) continue;
         grid.depth[gi] = d;
         grid.cell[gi] = f.cell[i];
+        grid.owner[gi] = li + 1;
       }
     }
   }
+}
+
+/**
+ * Sel tepi silhouette milik satu layer (yang terlihat): sel milik layer dengan tetangga 4-arah kosong
+ * atau milik layer lain. Sumber spawn aura. Hasil = index sel.
+ */
+export function edgeCells(grid: Grid, layer: string): number[] {
+  const id = grid.layers.indexOf(layer) + 1;
+  if (!id) return [];
+  const { cols, rows, owner } = grid;
+  const out: number[] = [];
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      const i = y * cols + x;
+      if (owner[i] !== id) continue;
+      if (x === 0 || y === 0 || x === cols - 1 || y === rows - 1 || owner[i - 1] !== id || owner[i + 1] !== id || owner[i - cols] !== id || owner[i + cols] !== id) out.push(i);
+    }
+  return out;
 }

@@ -22,6 +22,9 @@ export const MATERIALS = {
   wood: { label: 'Kayu', colors: ['#4a3420', '#8a6038', '#c89a60'] },
   visor: { label: 'Visor', colors: ['#2a3a26', '#8fae6a'] },
   // Hiasan helm: warna emas tanpa ganti glyph, supaya bentuk helm tetap dari ramp bake.
+  linen: { label: 'Linen', colors: ['#4e4432', '#a89870', '#ead9b5'] },
+  wool: { label: 'Wol', colors: ['#3e3024', '#7a6048', '#c0a080'] },
+  ruby: { label: 'Rubi', colors: ['#4a0e0c', '#d8644c', '#f8b0a0'] },
   brass: { label: 'Kuningan', colors: ['#5a3e10', '#b88a3a', '#f0d080'] },
   // Material blade (Forge). Pasangan glyph mengikuti reel ansenjeo.
   iron: { label: 'Iron #%', glyphs: '.:-=+##%%', colors: ['#4a4a4e', '#9c9ca0', '#e0e0dc'] },
@@ -44,6 +47,9 @@ export const DEFAULT_LOOK: Record<string, MaterialKey> = {
   blade: 'iron',
   shield: 'wood',
   wood: 'wood',
+  linen: 'linen',
+  wool: 'wool',
+  gem: 'ruby',
   visor: 'visor',
   trim: 'brass',
 };

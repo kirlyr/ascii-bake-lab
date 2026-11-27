@@ -145,6 +145,9 @@ const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'].flatMap((f) => [1,
 const helm = (name: string, url: string): Attachment => ({ name, url, bone: 'Head', position: [0, 0.1, 0.02], rotation: [0, 0, 0], scale: 0.14 });
 // Dengan pose kepalan Sword_Idle: blade turun ke depan, sisi lebar menghadap kamera (Z 90°).
 const weapon = (name: string, url: string, spin = 0): Attachment => ({ name, url, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [25, 0, 90], scale: 0.22, spin });
+// Modular Weapons Pack + Ultimate RPG Pack (CC0): konvensi node sama dengan Knight Pack, ukuran sedikit lebih besar.
+const W = '/assets/models/quaternius-weapons';
+const O = '/assets/models/quaternius-outfits';
 const SWORD_ARM: PoseOverlay = { from: `${UAL}#Sword_Idle`, at: 0, bones: ['clavicle_r', 'upperarm_r', 'lowerarm_r', 'hand_r', ...FINGERS] };
 
 // Karakter utama: badan Quaternius Universal Base Characters (Superhero_Male, proporsi realistis),
@@ -166,7 +169,7 @@ export const DEFAULT_PARAMS: BakeParams = {
   // (kepalan), jadi pedang tetap di tangan dan tidak terayun ke belakang saat walk.
   overlays: { idle: SWORD_ARM, walk: SWORD_ARM },
   clips: { idle: 'idle', walk: 'walk' },
-  outfits: ['/assets/models/quaternius-outfits/Male_Ranger.gltf'],
+  outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`],
   outfitInflate: 0.02,
   attachments: [
     ...['Helmet1', 'Helmet2', 'Helmet3'].map((h) => helm(h.toLowerCase(), `${Q}/${h}.glb`)),
@@ -175,24 +178,39 @@ export const DEFAULT_PARAMS: BakeParams = {
     // Sisi lebar Katana ada di sumbu lokal lain dari pedang Quaternius lainnya.
     weapon('katana', `${Q}/Katana.glb`, 90),
     weapon('club', `${Q}/Club.glb`),
+    { ...weapon('axe', `${W}/Axe.glb`, 90), scale: 0.18 },
+    { ...weapon('hammer', `${W}/Hammer_Double.glb`), scale: 0.18 },
+    { ...weapon('scythe', `${W}/Scythe.glb`, 90), scale: 0.18 },
+    // Tombak dipegang tegak (seperti penjaga), ujung ke atas: grid tidak melebar 2 m ke depan.
+    { ...weapon('spear', `${W}/Spear.glb`), rotation: [0, 0, 180], scale: 0.18 },
+    { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
+    { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
+    // Bantalan bahu Knight Pack: satu mesh melintang kedua bahu, ditempel ke tulang dada atas, miring 45°.
+    { name: 'pads', url: `${Q}/ShoulderPads.glb`, bone: 'spine_03', position: [0, 0.13, 0], rotation: [45, 0, 0], scale: 0.28 },
   ],
   layers: {
     body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes', 'Eyebrows'] } },
-    armor: {
+    // Outfit dipecah per bagian (mesh Ranger/Peasant memang terpisah), jadi bisa mix and match.
+    // Badan Superhero lebih besar dari tubuh untuk outfit ini: kulit menembus beberapa cm, jadi bias 4 cm.
+    ranger_torso: {
       label: 'Rompi Ranger',
-      slot: 'armor',
-      // Badan Superhero lebih besar dari tubuh untuk outfit Ranger: kulit menembus rompi beberapa cm.
+      slot: 'torso',
       bias: 0.04,
-      parts: {
-        cloth: ['Male_Ranger_Body', 'Male_Ranger_Legs'],
-        leather: ['Male_Ranger_Body_Belt_1', 'Male_Ranger_Body_Belt_2', 'Male_Ranger_Feet_Boots', 'Male_Ranger_Arms_Bracer'],
-        armor: ['Male_Ranger_Acc_Pauldron'],
-      },
+      parts: { cloth: ['Male_Ranger_Body'], leather: ['Male_Ranger_Body_Belt_1', 'Male_Ranger_Body_Belt_2', 'Male_Ranger_Arms_Bracer'] },
     },
+    peasant_torso: { label: 'Tunik Petani', slot: 'torso', bias: 0.04, parts: { linen: ['Male_Peasant_Body', 'Male_Peasant_Arms_1'] } },
+    ranger_legs: { label: 'Celana Ranger', slot: 'legs', bias: 0.04, parts: { cloth: ['Male_Ranger_Legs'] } },
+    peasant_legs: { label: 'Celana Petani', slot: 'legs', bias: 0.04, parts: { wool: ['Male_Peasant_Legs'] } },
+    ranger_feet: { label: 'Sepatu Ranger', slot: 'feet', bias: 0.04, parts: { leather: ['Male_Ranger_Feet_Boots'] } },
+    peasant_feet: { label: 'Sepatu Petani', slot: 'feet', bias: 0.04, parts: { wool: ['Male_Peasant_Feet'] } },
+    ranger_pauldron: { label: 'Pauldron Ranger', slot: 'shoulder', bias: 0.04, parts: { armor: ['Male_Ranger_Acc_Pauldron'] } },
+    knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
     // Varian per slot = layer terpisah. Ukuran file = jumlah layer, bukan kombinasi.
     helmet1: { label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
     helmet2: { label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
     helmet3: { label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
+    crown: { label: 'Mahkota', slot: 'helmet', parts: { trim: ['crown:Gold'] } },
+    crown2: { label: 'Mahkota Rubi', slot: 'helmet', parts: { trim: ['crown2:Gold'], gem: ['crown2:Red'] } },
     // Pedang Quaternius: blade sudah mesh terpisah, sumbu lokal +Z. `at` = pangkal blade (sumber socket).
     sword: {
       label: 'Pedang',
@@ -220,9 +238,36 @@ export const DEFAULT_PARAMS: BakeParams = {
       parts: { wood: ['club:Wood'], hilt: ['club:Black'] },
       blade: { mesh: 'club:Black', axis: 'z', at: 0.012, below: 'hilt', above: 'blade' },
     },
+    // Modular Weapons Pack: Steel + LightSteel = mata senjata (ikut forge), kayu = gagang.
+    axe: {
+      label: 'Kapak',
+      slot: 'weapon',
+      parts: { blade: ['axe:Steel', 'axe:LightSteel'], wood: ['axe:DarkWood', 'axe:LightWood'] },
+      blade: { mesh: 'axe:Steel', axis: 'z', at: 0.011, below: 'blade', above: 'blade' },
+    },
+    spear: {
+      label: 'Tombak',
+      slot: 'weapon',
+      parts: { blade: ['spear:Steel', 'spear:LightSteel'], wood: ['spear:DarkWood', 'spear:LightWood'] },
+      blade: { mesh: 'spear:Steel', axis: 'z', at: 0.057, below: 'blade', above: 'blade' },
+    },
+    // Palu: mesh Steel juga berisi cincin gagang (z < 0.015) = hilt; kepala = blade.
+    hammer: {
+      label: 'Palu Perang',
+      slot: 'weapon',
+      parts: { blade: ['hammer:Steel', 'hammer:LightSteel'], wood: ['hammer:DarkWood', 'hammer:LightWood'] },
+      blade: { mesh: 'hammer:Steel', axis: 'z', at: 0.015, below: 'hilt', above: 'blade' },
+    },
+    // Sabit: mata melintang di ujung gagang, sumbu lokal X.
+    scythe: {
+      label: 'Sabit Maut',
+      slot: 'weapon',
+      parts: { blade: ['scythe:Steel', 'scythe:LightSteel'], wood: ['scythe:DarkWood', 'scythe:LightWood'] },
+      blade: { mesh: 'scythe:Steel', axis: 'x', at: -0.006, below: 'blade', above: 'blade' },
+    },
   },
   // Mesh outfit yang tidak dipakai (lengan Ranger bertumpuk dengan lengan badan, hood diganti helm).
-  hidden: ['Male_Ranger_Arms_1', 'Male_Ranger_Arms_2', 'Male_Ranger_Head_Hood'],
+  hidden: ['Male_Ranger_Arms_1', 'Male_Ranger_Arms_2', 'Male_Ranger_Head_Hood', 'Male_Peasant_Arms_2'],
   // Ramp density gelap → terang. Shape vector tetap memilih di antara glyph ini,
   // jadi tepi tetap mengikuti silhouette. Charset penuh terlalu ramai (lihat README).
   charset: '.:-=+*#%@',

@@ -8,7 +8,7 @@ main { display:flex; gap:16px; padding:16px; align-items:flex-start; flex-wrap:w
 h1, h2 { margin:0 0 8px; font-size:13px; color:var(--gold); font-weight:700; }
 h2 { margin-top:14px; }
 canvas { display:block; }
-.controls { width:240px; }
+.controls { width:300px; }
 .row { display:flex; gap:6px; flex-wrap:wrap; }
 .col { display:flex; flex-direction:column; gap:4px; }
 .muted { color:var(--muted); }
@@ -20,3 +20,5 @@ input[type="checkbox"] { accent-color: var(--gold); }
 .slots { display:flex; flex-direction:column; gap:4px; }
 .slot-name { color:var(--muted); margin-top:4px; }
 .slot-name::before { content:'▸ '; color:var(--border); }
+select { background:var(--bg); color:var(--muted); border:1px solid var(--border); font:inherit; padding:1px 4px; margin-left:6px; }
+select:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
