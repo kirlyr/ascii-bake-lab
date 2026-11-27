@@ -57,3 +57,4 @@ button.primary { color:var(--gold); border-color:var(--gold); margin-top:4px; }
 .dev { flex:1 1 100%; }
 .dev summary { color:var(--muted); cursor:pointer; }
 .dev[open] > * + * { margin-top:8px; }
+[hidden] { display:none !important; }

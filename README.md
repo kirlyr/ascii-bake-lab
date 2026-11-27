@@ -118,12 +118,21 @@ Player (`/`) = Tavern wardrobe bergaya inventory game (UI berbahasa Inggris, tan
 
 ![tavern inventory](docs/media/tavern-inventory.png)
 
+## Efek rune & aura
+
+`RuneEmitter` (`src/shared/runes.ts`) menggambar 4 lapis: sel di bawah glyph dikosongkan, halo (sprite gradien radial,
+blend `lighter`, efek bloom), glyph kecil yang di-snap ke sel, dan sesekali glyph besar 2× yang melayang bebas.
+Intensitas per efek bisa dipilih di panel detail: **Faint / Bright / Radiant** (`LEVELS`), mengalikan jumlah partikel,
+sebaran, umur, peluang glyph besar, dan ukuran halo. Disimpan di loadout (`levels`, key = slot aura atau `rune`).
+
+![level efek](docs/media/effect-levels.png)
+
 ## Loadout (Tavern → Home)
 
 Semua pilihan di player (equipment, pewarna, material blade, aura, rune) disimpan sebagai loadout di `localStorage`
 pengunjung (`src/shared/loadout.ts`, key `ascii-hero-loadout`) dan langsung dipulihkan saat halaman dibuka lagi.
-`/home.html` (prototype Home) hanya memuat `hero.bake`, sudut samping, idle, tanpa kontrol, dan memakai loadout yang
-sama. Jadi player = Tavern = tempat kustomisasi karakter Home. Nilai yang tidak dikenal lagi (layer dihapus, palet
+`/home.html` (prototype Home) memuat `hero.bake` dulu (karakter langsung tampil), lalu `hero-turn.bake` di belakang
+layar; setelah itu karakter bisa diputar (drag atau ⟲ ⟳). Memakai loadout yang sama. Jadi player = Tavern = tempat kustomisasi karakter Home. Nilai yang tidak dikenal lagi (layer dihapus, palet
 diganti) jatuh ke default bake. Tiap pengunjung punya loadout sendiri; tanpa loadout tersimpan = susunan default.
 
 ![home dengan loadout](docs/media/home-loadout.png)

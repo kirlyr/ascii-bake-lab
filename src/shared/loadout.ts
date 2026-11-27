@@ -3,7 +3,7 @@
 import type { BakeFile } from './format';
 import { defaultEquipment, type Equipment } from './compose';
 import { BLADE_MATERIALS, DYEABLE, lookFor, type Material, type MaterialKey } from './materials';
-import { AURAS, RUNES, type AuraKey, type RuneKey } from './runes';
+import { AURAS, RUNES, type AuraKey, type EffectLevel, type RuneKey } from './runes';
 
 export interface Loadout {
   equip: Equipment;
@@ -13,6 +13,8 @@ export interface Loadout {
   /** slot → aura */
   auras: Record<string, AuraKey>;
   rune: RuneKey | null;
+  /** intensitas efek: key = slot (aura) atau 'rune'. Tanpa entri = 2. */
+  levels: Record<string, EffectLevel>;
 }
 
 const KEY = 'ascii-hero-loadout';
@@ -24,6 +26,7 @@ export function defaultLoadout(file: BakeFile): Loadout {
     blade: 'iron',
     auras: {},
     rune: null,
+    levels: {},
   };
 }
 
@@ -45,6 +48,7 @@ export function loadLoadout(file: BakeFile): Loadout {
   if (BLADE_MATERIALS.includes(saved.blade as MaterialKey)) out.blade = saved.blade!;
   for (const [slot, aura] of Object.entries(saved.auras ?? {})) if (slot in out.equip && aura in AURAS) out.auras[slot] = aura;
   if (saved.rune && saved.rune in RUNES) out.rune = saved.rune;
+  for (const [k, v] of Object.entries(saved.levels ?? {})) if ((k === 'rune' || k in out.equip) && [1, 2, 3].includes(v)) out.levels[k] = v;
   return out;
 }
 
@@ -61,3 +65,5 @@ export function materialsFor(file: BakeFile, l: Loadout): Record<string, Materia
   const dyes = Object.fromEntries(Object.entries(l.dye).map(([p, k]) => [p, DYEABLE[p].palette[k]]));
   return lookFor(file.parts, { ...dyes, blade: l.blade });
 }
+
+export const levelOf = (l: Loadout, key: string): EffectLevel => l.levels[key] ?? 2;

@@ -42,11 +42,13 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Pewarna per part (kain, kulit, linen, wol, pelat, helm, hiasan) + format biner `.bake` (gzip, plane cell/depth):
   hero.bake 195 KB, hero-turn.bake 195 KB (dari 280/270 KB JSON gzip). JSON tidak lagi di-commit. (2026-11-27)
 - Loadout (2026-11-27, user minta): kustomisasi di Tavern disimpan di localStorage pengunjung dan otomatis dipakai
-  Home (`src/shared/loadout.ts`, prototype `/home.html`, hanya `hero.bake`).
+  Home (`src/shared/loadout.ts`, prototype `/home.html`).
 - Tavern inventory (2026-11-27, user minta, referensi screenshot inventory ansenjeo): paper doll + bag ikon +
   drag & drop + panel detail (deskripsi English, tanpa stats). Rune 5. UI Tavern berbahasa Inggris.
 - Putar tanpa mirror (2026-11-27, keluhan user: pauldron pindah pundak saat diputar): `hero-turn.bake` = 16 arah
   penuh, 342 KB. Mirror hanya untuk berjalan ke arah sebaliknya.
+- Home bisa diputar (2026-11-27, user minta): `hero-turn.bake` dimuat setelah karakter tampil. Logika putar bersama di
+  `src/shared/turn.ts`. Efek rune/aura: halo bloom + glyph besar, level Faint/Bright/Radiant per efek (user minta).
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
