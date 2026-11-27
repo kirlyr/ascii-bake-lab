@@ -26,10 +26,10 @@ def cross(a, b):
 
 
 def bend(p):
-    """Sayap melengkung mengikuti punggung: makin jauh dari tulang belakang, makin maju membungkus sisi badan.
-    Dari samping sayap jadi punya volume, bukan bidang tipis."""
+    """Sayap melengkung sedikit mengikuti punggung (volume dari samping), dirapatkan 15% ke tulang belakang.
+    Lengkung dibatasi 5 cm: lebih dari itu tepi luar sayap maju menembus lengan yang tergantung di sisi badan."""
     ax = abs(p[0])
-    return [p[0], p[1], p[2] + 0.13 * max(0.0, (ax - 0.07) / 0.22) ** 1.6]
+    return [p[0] * 0.85, p[1], p[2] + 0.05 * max(0.0, (ax - 0.07) / 0.22) ** 1.6]
 
 
 def feather(root, tip, width, out, ragged=False, seg=12, twist=0.0):

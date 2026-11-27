@@ -291,7 +291,7 @@ export const DEFAULT_PARAMS: BakeParams = {
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
     // Bias sedikit di atas baju (0,04): jubah menempel di punggung. Lebih besar = jubah menutupi lengan dari samping.
     cloak: { label: 'Cloak', slot: 'back', bias: 0.05, parts: { cloak: ['cloak:Cloth'] } },
-    wings: { label: 'Fallen Wings', slot: 'back', bias: 0.06, parts: { feather: ['wings:Feather', 'wings:Bone'] } },
+    wings: { label: 'Fallen Wings', slot: 'back', bias: 0.02, parts: { feather: ['wings:Feather', 'wings:Bone'] } },
     // Varian per slot = layer terpisah. Ukuran file = jumlah layer, bukan kombinasi.
     helmet1: { bias: 0.02, hides: ['hair'], label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
     helmet2: { bias: 0.02, hides: ['hair'], label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
