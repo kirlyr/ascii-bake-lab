@@ -130,12 +130,13 @@ diganti) jatuh ke default bake. Tiap pengunjung punya loadout sendiri; tanpa loa
 
 ## Memutar karakter (16 arah, idle napas)
 
-Preset `hero-turn` (`/bake.html?model=hero-turn`) mem-bake **4 frame idle** (merata sepanjang clip, `stillFrames: 4`) dari 9 arah (`views`: 0°, −22,5° … −180°),
-semua layer equipment, ke `public/baked/hero-turn.bake` (`TurnFile`). 7 arah lainnya = mirror. Semua arah berbagi
+Preset `hero-turn` (`/bake.html?model=hero-turn`) mem-bake **4 frame idle** (merata sepanjang clip, `stillFrames: 4`) dari **16 arah penuh** (`views`: 0°, −22,5° … −337,5°),
+semua layer equipment, ke `public/baked/hero-turn.bake` (`TurnFile`). Tanpa mirror: karakter tidak simetris
+(pauldron satu sisi, senjata di tangan kanan), jadi mirror membuat item pindah sisi saat diputar. Semua arah berbagi
 framing, rentang depth, dan auto-level; grid dipusatkan ke origin model supaya karakter tidak bergeser saat diputar.
 
-Player: drag karakter atau tombol ⟲ ⟳ (per 22,5°). Arah samping (±90°) memakai `hero.bake` yang beranimasi
-(idle/walk); arah lain memutar 4 frame idle itu (±1,6 fps, satu siklus napas 2,5 detik). Kedua file disejajarkan lewat `origin` (titik antara kaki, di grid) yang kini
+Player: drag karakter atau tombol ⟲ ⟳ (per 22,5°). Arah bake (−90°) memakai `hero.bake` yang beranimasi
+(idle/walk); berjalan ke arah sebaliknya = `hero.bake` di-mirror (seperti game 2D). Arah lain, termasuk +90° saat idle, memutar 4 frame idle itu (±1,6 fps, satu siklus napas 2,5 detik). Kedua file disejajarkan lewat `origin` (titik antara kaki, di grid) yang kini
 disimpan tiap BakeFile. Di portfolio, `hero-turn.bake` cukup dimuat di Tavern.
 
 ![16 arah, ditampilkan 8](docs/media/turn.png)
@@ -186,7 +187,7 @@ Perbaikan karakter (PR #5):
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
 | `hero.bake` | **195 KB** (JSON base64 + gzip sebelumnya: 280 KB) |
-| `hero-turn.bake` | 9 arah × 22 layer × 4 frame = **195 KB** (JSON sebelumnya: 270 KB) |
+| `hero-turn.bake` | 16 arah × 22 layer × 4 frame = **342 KB** (9 arah + mirror sebelumnya: 195 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan

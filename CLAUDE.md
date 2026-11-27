@@ -45,6 +45,8 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   Home (`src/shared/loadout.ts`, prototype `/home.html`, hanya `hero.bake`).
 - Tavern inventory (2026-11-27, user minta, referensi screenshot inventory ansenjeo): paper doll + bag ikon +
   drag & drop + panel detail (deskripsi English, tanpa stats). Rune 5. UI Tavern berbahasa Inggris.
+- Putar tanpa mirror (2026-11-27, keluhan user: pauldron pindah pundak saat diputar): `hero-turn.bake` = 16 arah
+  penuh, 342 KB. Mirror hanya untuk berjalan ke arah sebaliknya.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
