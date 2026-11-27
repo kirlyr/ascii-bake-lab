@@ -23,7 +23,7 @@ export interface RuneDef {
 
 export const RUNES = {
   fire: {
-    label: 'Api ^',
+    label: 'Fire ^',
     rate: 120,
     life: [0.4, 1.0],
     vel: [0, -8],
@@ -32,15 +32,57 @@ export const RUNES = {
     colors: ['#fff0b0', '#f6c45a', '#d8644c', '#6a2418'],
     glow: '#d8644c',
   },
+  // Petir: umur pendek, sebaran lebar, glyph zigzag. Kesan berkedip tanpa logika khusus.
+  lightning: {
+    label: 'Lightning z',
+    rate: 90,
+    life: [0.08, 0.25],
+    vel: [0, 0],
+    jitter: 22,
+    glyphs: 'zZ/\\',
+    colors: ['#ffffff', '#c8e8ff', '#6aa0e8', '#203a68'],
+    glow: '#8ac0ff',
+  },
+  // Darah: menetes ke bawah dari blade.
+  blood: {
+    label: 'Blood ~',
+    rate: 45,
+    life: [0.6, 1.4],
+    vel: [0, 9],
+    jitter: 0.6,
+    glyphs: "~o.'",
+    colors: ['#f08a6c', '#c0392b', '#7a1a12', '#2a0806'],
+    glow: '#a83a2a',
+  },
+  venom: {
+    label: 'Venom §',
+    rate: 60,
+    life: [0.5, 1.2],
+    vel: [0, 5],
+    jitter: 1.5,
+    glyphs: '§o:.',
+    colors: ['#e0f8b0', '#8fae6a', '#4a6a2a', '#1a2a10'],
+    glow: '#8fae6a',
+  },
+  frost: {
+    label: 'Frost *',
+    rate: 70,
+    life: [0.6, 1.4],
+    vel: [0, 1.5],
+    jitter: 2.5,
+    glyphs: '*+:.',
+    colors: ['#f0fbff', '#a8d8f0', '#5a90b8', '#1e3448'],
+    glow: '#a8d8f0',
+  },
 } satisfies Record<string, RuneDef>;
 
 export type RuneKey = keyof typeof RUNES;
 
 /** Aura per item: partikel lahir di tepi silhouette layer, lebih jarang dan lambat dari rune. */
 export const AURAS = {
-  ember: { ...RUNES.fire, label: 'Bara', rate: 45, vel: [0, -5], jitter: 2 },
+  ember: { ...RUNES.fire, label: 'Ember', rate: 45, vel: [0, -5], jitter: 2 },
   holy: {
-    label: 'Suci',
+    label: 'Holy',
     rate: 40,
     life: [0.6, 1.4],
     vel: [0, -3],
@@ -50,7 +92,7 @@ export const AURAS = {
     glow: '#f6dc8c',
   },
   frost: {
-    label: 'Es',
+    label: 'Frost',
     rate: 40,
     life: [0.6, 1.4],
     vel: [0, 2],
@@ -60,7 +102,7 @@ export const AURAS = {
     glow: '#a8d8f0',
   },
   shadow: {
-    label: 'Bayangan',
+    label: 'Shadow',
     rate: 50,
     life: [0.7, 1.6],
     vel: [0, -4],
@@ -70,7 +112,7 @@ export const AURAS = {
     glow: '#8a5ab0',
   },
   venom: {
-    label: 'Racun',
+    label: 'Venom',
     rate: 40,
     life: [0.5, 1.2],
     vel: [0, 4],
