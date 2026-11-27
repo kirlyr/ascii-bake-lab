@@ -1,29 +1,27 @@
-// Player produksi: memutar JSON hasil bake sebagai teks di canvas. Tanpa Three.js.
-import type { BakeFile, TurnFile } from '../shared/format';
+// Player produksi: memutar hasil bake (.bake) sebagai teks di canvas. Tanpa Three.js.
+import { loadBake, type BakeFile, type TurnFile } from '../shared/format';
 import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment, type Sprite } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
 import { AURAS, RUNES, RuneEmitter, alongBlade, alongEdge, type AuraKey, type RuneKey, type Spawn } from '../shared/runes';
-import { BLADE_MATERIALS, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
+import { BLADE_MATERIALS, DYEABLE, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
 
 const MODEL = new URLSearchParams(location.search).get('model') ?? 'hero';
-const URL_JSON = `${import.meta.env.BASE_URL}baked/${MODEL}.json`;
+const URL_BAKE = `${import.meta.env.BASE_URL}baked/${MODEL}.bake`;
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const info = $<HTMLElement>('#info');
 $<HTMLElement>('h1').textContent = `┤ ${MODEL.toUpperCase()} ├`;
 
-// `<model>-turn.json` (opsional) = 16 arah idle napas (4 frame) untuk memutar karakter. Di portfolio cukup dimuat di Tavern.
-const [text, turnText] = await Promise.all([
-  fetch(URL_JSON).then((r) => r.text()),
-  fetch(URL_JSON.replace(/\.json$/, '-turn.json')).then((r) => (r.ok ? r.text() : null)),
-]);
-const file = JSON.parse(text) as BakeFile;
-const turn = turnText ? (JSON.parse(turnText) as TurnFile) : null;
+// `<model>-turn.bake` (opsional) = 16 arah idle napas (4 frame) untuk memutar karakter. Di portfolio cukup dimuat di Tavern.
+const [main, turnBake] = await Promise.all([loadBake<BakeFile>(URL_BAKE), loadBake<TurnFile>(URL_BAKE.replace(/\.bake$/, '-turn.bake'))]);
+if (!main) throw new Error(`${URL_BAKE} tidak ada. Bake dulu lewat /bake.html.`);
+const file = main.data;
+const turn = turnBake?.data ?? null;
 await document.fonts.load('700 10px "JetBrains Mono"');
 
-const sprite = decodeSprite(file);
+const sprite = decodeSprite(file, main.planes);
 // yaw view (0..-180) → sprite. Arah +yaw = mirror dari -yaw.
-const turnViews = new Map<number, Sprite>((turn?.views ?? []).map((v) => [v.yaw ?? 0, decodeSprite(v)]));
+const turnViews = new Map<number, Sprite>((turn?.views ?? []).map((v) => [v.yaw ?? 0, decodeSprite(v, turnBake!.planes)]));
 // Grid cukup lebar untuk semua arah; tiap file disejajarkan lewat origin (titik antara kaki).
 const cols = Math.max(file.cols, ...(turn?.views ?? []).map((v) => v.cols));
 const grid = createGrid(cols, file.rows);
@@ -81,8 +79,30 @@ equipEl.addEventListener('click', (e) => {
 });
 
 // Material blade: ganti tabel glyph/warna part "blade" saja, tanpa re-bake.
-const applyLook = () => view.setLook({ parts: file.parts, ramp: file.ramp, materials: lookFor(file.parts, { blade: state.blade }) });
+// Pewarna: part → key palet. Sama seperti material blade, hanya tabel warna yang dibangun ulang.
+const dye: Record<string, string> = Object.fromEntries(Object.entries(DYEABLE).map(([p, d]) => [p, d.initial]));
+const applyLook = () => {
+  const dyes = Object.fromEntries(Object.entries(dye).map(([p, k]) => [p, DYEABLE[p].palette[k]]));
+  view.setLook({ parts: file.parts, ramp: file.ramp, materials: lookFor(file.parts, { ...dyes, blade: state.blade }) });
+};
 applyLook();
+const dyeEl = $<HTMLElement>('#dye');
+for (const [part, d] of Object.entries(DYEABLE)) {
+  if (!file.parts.includes(part)) continue;
+  const swatches = Object.entries(d.palette)
+    .map(([k, m]) => `<button class="swatch" data-dye="${part}" data-key="${k}" aria-pressed="${k === d.initial}" aria-label="${d.label}: ${m.label}" title="${m.label}" style="--c:${m.colors[1]}"></button>`)
+    .join('');
+  dyeEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${d.label}</span><div class="row" role="group" aria-label="Warna ${d.label}">${swatches}</div>`);
+}
+dyeEl.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-dye]');
+  if (!b) return;
+  const part = b.dataset.dye!;
+  dye[part] = b.dataset.key!;
+  dyeEl.querySelectorAll<HTMLButtonElement>(`[data-dye="${part}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  applyLook();
+  paint();
+});
 const bladeEl = $<HTMLElement>('#blade');
 if (file.parts.includes('blade')) {
   for (const k of BLADE_MATERIALS) bladeEl.insertAdjacentHTML('beforeend', `<button data-blade="${k}" aria-pressed="${k === state.blade}">${MATERIALS[k].label}</button>`);
@@ -230,4 +250,5 @@ draw();
 requestAnimationFrame(tick);
 
 const frames = Object.values(file.layers).reduce((n, l) => n + Object.values(l.clips).reduce((m, f) => m + f.length, 0), 0);
-info.textContent = `${file.cols}×${file.rows} sel · ${file.fps} fps · ${frames} frame total · ${(text.length / 1024).toFixed(0)} KB JSON (sebelum gzip)`;
+info.textContent = `${file.cols}×${file.rows} sel · ${file.fps} fps · ${frames} frame total · ` +
+  [main, turnBake].filter((b) => b?.bytes).map((b, i) => ` · ${i ? 'turn' : 'hero'} ${(b!.bytes / 1024).toFixed(0)} KB`).join('');

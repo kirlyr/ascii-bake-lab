@@ -7,7 +7,7 @@ const modelKey = query.get('model') ?? 'hero';
 // `?o={...}` menimpa field preset sebelum model dimuat (dipakai untuk tuning posisi aksesori).
 const preset = PRESETS[modelKey] && { ...PRESETS[modelKey], ...JSON.parse(query.get('o') ?? '{}') };
 if (!preset) throw new Error(`Preset model "${modelKey}" tidak ada. Pilihan: ${Object.keys(PRESETS).join(', ')}`);
-import type { BakeFile, TurnFile } from '../shared/format';
+import { packBake, type BakeFile, type TurnFile } from '../shared/format';
 import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment } from '../shared/compose';
 import { AsciiCanvas } from '../shared/ascii-canvas';
 import { lookFor } from '../shared/materials';
@@ -38,7 +38,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 // Satu arah = BakeFile; banyak arah (`views`) = TurnFile.
 let result: BakeFile | TurnFile | null = null;
 const ctx = await loadModel(preset, renderer);
-$('save').textContent = `Simpan ke public/baked/${modelKey}.json`;
+$('save').textContent = `Simpan ke public/baked/${modelKey}.bake`;
 status.textContent = `Model ${modelKey} siap. Clip: ${ctx.animations.length}, mesh: ${ctx.meshes.size}.`;
 
 // Preview 3D: layer tanpa slot + varian pertama tiap slot (varian lain saling tumpuk).
@@ -92,8 +92,8 @@ $('download').onclick = () => {
 };
 $('save').onclick = async () => {
   if (!result) return;
-  const res = await fetch(`/__bake/save?name=${modelKey}`, { method: 'POST', body: JSON.stringify(result) });
-  status.textContent = res.ok ? `Tersimpan ke public/baked/${modelKey}.json` : `Gagal simpan: ${res.status}`;
+  const res = await fetch(`/__bake/save?name=${modelKey}`, { method: 'POST', body: packBake(result) });
+  status.textContent = res.ok ? `Tersimpan ke public/baked/${modelKey}.bake` : `Gagal simpan: ${res.status}`;
 };
 
 // Untuk bake headless (Playwright): window.__bake(overrides) → BakeFile
