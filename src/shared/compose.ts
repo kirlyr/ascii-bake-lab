@@ -63,9 +63,9 @@ export function defaultEquipment(file: BakeFile): Equipment {
 
 /** Layer aktif untuk compose, urut sesuai file (urutan tidak memengaruhi hasil, depth yang menentukan). */
 export function activeLayers(file: BakeFile, eq: Equipment): string[] {
-  return Object.entries(file.layers)
-    .filter(([k, l]) => !l.slot || eq[l.slot] === k)
-    .map(([k]) => k);
+  const on = Object.entries(file.layers).filter(([k, l]) => !l.slot || eq[l.slot] === k);
+  const hidden = new Set(on.flatMap(([, l]) => l.hides ?? []));
+  return on.filter(([, l]) => !l.slot || !hidden.has(l.slot)).map(([k]) => k);
 }
 
 export function createGrid(cols: number, rows: number): Grid {

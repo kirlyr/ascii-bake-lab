@@ -88,7 +88,7 @@ function changed() {
   draw();
 }
 
-const SLOT_SIDE = { 'slots-l': ['helmet', 'shoulder', 'torso', 'back'], 'slots-r': ['weapon', 'legs', 'feet'] };
+const SLOT_SIDE = { 'slots-l': ['helmet', 'shoulder', 'torso', 'back'], 'slots-r': ['hair', 'beard', 'weapon', 'legs', 'feet'] };
 function renderSlots() {
   for (const [id, slots] of Object.entries(SLOT_SIDE)) {
     const el = $<HTMLElement>(`#${id}`);

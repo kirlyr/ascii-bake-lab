@@ -14,6 +14,8 @@ export interface LayerDef {
    * player memasang maksimal satu per slot. Tanpa slot = selalu tampil (badan).
    */
   slot?: string;
+  /** slot lain yang disembunyikan selama layer ini terpasang (helm menutup rambut). */
+  hides?: string[];
   /** hanya layer senjata: split hilt/blade + sumber socket blade. */
   blade?: BladeSplit;
   /** meter. Layer ini menang atas layer yang lebih dekat ≤ jarak ini (lihat LayerData.bias). */
@@ -54,6 +56,13 @@ export interface Attachment {
   spin?: number;
   /** true = mesh dibuat di ruang model saat rest pose (bukan ruang tulang); position/rotation/scale diabaikan. */
   rest?: boolean;
+  /**
+   * Dengan `rest`: pakai pose frame 0 clip ini sebagai ruang model, bukan rest pose. Untuk benda panjang kaku
+   * (sayap): kemiringan tulang di rest pose ikut membesar di ujungnya, jadi bentuknya dibuat di pose yang terlihat.
+   */
+  restClip?: string;
+  /** true = metalness 0. Tanpa env map, logam hanya menggelapkan diffuse: benda kecil seperti mahkota jadi glyph redup. */
+  matte?: boolean;
 }
 
 export interface PoseOverlay {
@@ -204,7 +213,8 @@ export const DEFAULT_PARAMS: BakeParams = {
     },
   ],
 
-  outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`],
+  // Rambut + janggut Universal Base Characters (sudah di-rig ke skeleton yang sama).
+  outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`, ...['SimpleParted', 'Buzzed', 'Long', 'Beard'].map((h) => `${UBC}/Hair_${h}.gltf`)],
   outfitInflate: 0.02,
   attachments: [
     ...['Helmet1', 'Helmet2', 'Helmet3'].map((h) => helm(h.toLowerCase(), `${Q}/${h}.glb`)),
@@ -218,12 +228,13 @@ export const DEFAULT_PARAMS: BakeParams = {
     { ...weapon('scythe', `${W}/Scythe.glb`, 90), scale: 0.18 },
     // Tombak dipegang tegak (seperti penjaga), ujung ke atas: grid tidak melebar 2 m ke depan.
     { ...weapon('spear', `${W}/Spear.glb`), rotation: [0, 0, 180], scale: 0.18 },
-    { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
-    { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
+    // Mahkota duduk di atas rambut, lebih besar dan lebih tinggi: pita setinggi 2 baris hanya jadi glyph tepi di ASCII.
+    { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.19, 0.01], scale: [0.31, 0.37, 0.31], matte: true },
+    { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.19, 0.01], scale: [0.31, 0.37, 0.31], matte: true },
     // Jubah buatan sendiri (assets/models/cloak/make_cloak.py), ruang model rest pose; disimulasikan (lihat `cloth`).
     { name: 'cloak', url: '/assets/models/cloak/Cloak.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
-    // Sayap bulu buatan sendiri (assets/models/wings/make_wings.py), sudah Y-atas dalam meter. Satu slot dengan jubah.
-    { name: 'wings', url: '/assets/models/wings/Wings.glb', bone: 'spine_03', position: [0, 0.02, 0], rotation: [0, 0, 0], scale: 1 },
+    // Sayap terlipat buatan sendiri (assets/models/wings/make_wings.py), ruang model rest pose. Satu slot dengan jubah.
+    { name: 'wings', url: '/assets/models/wings/Wings.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true, restClip: 'idle' },
     // Pelat kaki + sepatu besi buatan sendiri (assets/models/greaves/make_greaves.py), dibuat di ruang model rest pose.
     ...(['l', 'r'] as const).flatMap((s): Attachment[] =>
       ([['thigh', 'Thigh'], ['calf', 'Greave'], ['foot', 'Sabaton']] as const).map(([bone, file]) => ({
@@ -249,7 +260,12 @@ export const DEFAULT_PARAMS: BakeParams = {
     { name: 'pads', url: `${Q}/ShoulderPads.glb`, bone: 'spine_03', position: [0, 0.13, 0], rotation: [45, 0, 0], scale: 0.28 },
   ],
   layers: {
-    body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes', 'Eyebrows'] } },
+    body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes'], hair: ['Eyebrows'] } },
+    // Rambut: varian pertama = bawaan (hitam lewat pewarna `hair`). Slot bisa dikosongkan (botak / tanpa janggut).
+    hair_parted: { label: 'Rambut Belah', slot: 'hair', parts: { hair: ['Hair_SimpleParted'] } },
+    hair_buzzed: { label: 'Rambut Cepak', slot: 'hair', parts: { hair: ['Hair_Buzzed'] } },
+    hair_long: { label: 'Rambut Panjang', slot: 'hair', parts: { hair: ['Hair_Long'] } },
+    beard: { label: 'Janggut', slot: 'beard', parts: { hair: ['Hair_Beard'] } },
     // Outfit dipecah per bagian (mesh Ranger/Peasant memang terpisah), jadi bisa mix and match.
     // Badan Superhero lebih besar dari tubuh untuk outfit ini: kulit menembus beberapa cm, jadi bias 4 cm.
     ranger_torso: {
@@ -273,14 +289,15 @@ export const DEFAULT_PARAMS: BakeParams = {
     plate_feet: { label: 'Sepatu Besi', slot: 'feet', bias: 0.04, parts: { armor: ['sabaton_l:Plate', 'sabaton_r:Plate'] } },
     ranger_pauldron: { label: 'Pauldron Ranger', slot: 'shoulder', bias: 0.04, parts: { armor: ['Male_Ranger_Acc_Pauldron'] } },
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
-    cloak: { label: 'Cloak', slot: 'back', parts: { cloak: ['cloak:Cloth'] } },
-    wings: { label: 'Feathered Wings', slot: 'back', parts: { feather: ['wings:Feather', 'wings:Bone'] } },
+    // Bias sedikit di atas baju (0,04): jubah menempel di punggung. Lebih besar = jubah menutupi lengan dari samping.
+    cloak: { label: 'Cloak', slot: 'back', bias: 0.05, parts: { cloak: ['cloak:Cloth'] } },
+    wings: { label: 'Fallen Wings', slot: 'back', bias: 0.06, parts: { feather: ['wings:Feather', 'wings:Bone'] } },
     // Varian per slot = layer terpisah. Ukuran file = jumlah layer, bukan kombinasi.
-    helmet1: { bias: 0.02, label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
-    helmet2: { bias: 0.02, label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
-    helmet3: { bias: 0.02, label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
-    crown: { label: 'Mahkota', slot: 'helmet', parts: { trim: ['crown:Gold'] } },
-    crown2: { label: 'Mahkota Rubi', slot: 'helmet', parts: { trim: ['crown2:Gold'], gem: ['crown2:Red'] } },
+    helmet1: { bias: 0.02, hides: ['hair'], label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
+    helmet2: { bias: 0.02, hides: ['hair'], label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
+    helmet3: { bias: 0.02, hides: ['hair'], label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
+    crown: { label: 'Mahkota', slot: 'helmet', bias: 0.03, parts: { trim: ['crown:Gold'] } },
+    crown2: { label: 'Mahkota Rubi', slot: 'helmet', bias: 0.03, parts: { trim: ['crown2:Gold'], gem: ['crown2:Red'] } },
     // Pedang Quaternius: blade sudah mesh terpisah, sumbu lokal +Z. `at` = pangkal blade (sumber socket).
     sword: {
       label: 'Pedang',
@@ -377,6 +394,8 @@ function makeDepthMaterial(near: number, far: number) {
     vertexShader: depthVert,
     fragmentShader: depthFrag,
     uniforms: { uNear: { value: near }, uFar: { value: far } },
+    // Dua sisi: permukaan tipis (jubah, sayap) dilihat dari sisi belakang mesh tetap tercatat; tanpa ini badan tembus.
+    side: THREE.DoubleSide,
   });
 }
 
@@ -409,6 +428,7 @@ function makeIdMaterial(below: number, above = below, axis = new THREE.Vector3(0
     vertexShader: idVert,
     fragmentShader: idFrag,
     uniforms: { uAxis: { value: axis }, uAt: { value: at }, uBelow: { value: below }, uAbove: { value: above } },
+    side: THREE.DoubleSide,
   });
 }
 
@@ -519,10 +539,20 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     holder.add(acc);
     acc.rotation.y = THREE.MathUtils.degToRad(a.spin ?? 0);
     if (a.rest) {
-      // Belum ada animasi: matrixWorld tulang = rest pose. holder = ruang model → ruang tulang.
+      // holder = ruang model (rest pose, atau frame 0 `restClip`) → ruang tulang.
+      // Mixer sementara; stopAllAction mengembalikan tulang ke rest pose untuk attachment berikutnya.
+      const mixer = new THREE.AnimationMixer(root);
+      if (a.restClip) {
+        const clip = animations.find((c) => c.name === a.restClip);
+        if (!clip) throw new Error(`Attachment ${a.name}: clip "${a.restClip}" tidak ada`);
+        mixer.clipAction(clip).play();
+        mixer.setTime(0);
+      }
       root.updateMatrixWorld(true);
       holder.matrixAutoUpdate = false;
       holder.matrix.copy(bone.matrixWorld).invert().multiply(root.matrixWorld);
+      mixer.stopAllAction();
+      mixer.uncacheRoot(root);
     } else {
       holder.position.fromArray(a.position);
       holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
@@ -533,6 +563,7 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     acc.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
+      if (a.matte) (m.material as THREE.MeshStandardMaterial).metalness = 0;
       m.name = `${a.name}:${(m.material as THREE.Material).name}`;
       meshes.set(m.name, m);
     });
@@ -940,6 +971,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
       const meshes = new Set(layerMeshes(layer));
       out.layers[layerKey] = { label: layer.label, clips: {} };
       if (layer.slot) out.layers[layerKey].slot = layer.slot;
+      if (layer.hides) out.layers[layerKey].hides = layer.hides;
       if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
       setVisible(ctx, meshes);
       const blade = layer.blade && splits.has(layer.blade.mesh) ? bladeLocalOf(layer.blade) : null;

@@ -31,6 +31,7 @@ export const MATERIALS = {
   steel: { label: 'Steel @%', glyphs: '.:-=+@@%%', colors: ['#34404c', '#90a4b8', '#eef4fa'] },
   gold: { label: 'Gold 0o', glyphs: '.:-=+00oo', colors: ['#5a3e10', '#d4a64a', '#f6dc8c'] },
   bloodiron: { label: 'Bloodiron B8', glyphs: '.:-=+BB88', colors: ['#3a0e0c', '#a83a2a', '#f08a6c'] },
+  hair: { label: 'Rambut', colors: ['#141210', '#3a332c', '#7a6e60'] },
 } satisfies Record<string, Material>;
 
 export type MaterialKey = keyof typeof MATERIALS;
@@ -54,6 +55,7 @@ export const DEFAULT_LOOK: Record<string, MaterialKey> = {
   trim: 'brass',
   cloak: 'wool',
   feather: 'linen',
+  hair: 'hair',
 };
 
 /**
@@ -72,6 +74,15 @@ export const DYES = {
   snow: { label: 'Snow', colors: ['#5a5a58', '#c8c8c0', '#ffffff'] },
   raven: { label: 'Raven', colors: ['#18181c', '#3a3a44', '#76768a'] },
   charcoal: { label: 'Charcoal', colors: ['#2a2622', '#5a544c', '#b0a898'] },
+} satisfies Record<string, Material>;
+
+/** Warna rambut: hitam bawaan. Stop terang dijaga cukup terang supaya helai tetap terbaca di latar gelap. */
+export const HAIR_DYES = {
+  black: { label: 'Black', colors: ['#141210', '#3a332c', '#7a6e60'] },
+  brown: { label: 'Brown', colors: ['#2a1a10', '#5e3c22', '#a8784a'] },
+  auburn: { label: 'Auburn', colors: ['#2e120a', '#7a3018', '#c8643a'] },
+  blond: { label: 'Blond', colors: ['#4a3a1a', '#a88a4a', '#ecd49a'] },
+  grey: { label: 'Grey', colors: ['#34322e', '#7a7670', '#d0ccc4'] },
 } satisfies Record<string, Material>;
 
 export const FINISHES = {
@@ -93,6 +104,7 @@ export const DYEABLE: Record<string, { label: string; palette: Record<string, Ma
   trim: { label: 'Trim', palette: FINISHES, initial: 'gold' },
   cloak: { label: 'Cloak', palette: DYES, initial: 'charcoal' },
   feather: { label: 'Feather', palette: DYES, initial: 'raven' },
+  hair: { label: 'Hair', palette: HAIR_DYES, initial: 'black' },
 };
 
 /** Material per part. `overrides` = key MATERIALS atau Material langsung (pewarna). */

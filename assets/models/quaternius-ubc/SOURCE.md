@@ -11,3 +11,6 @@
   animasi dari `webgl-games/opencity` (`assets/characters/UAL1_Standard.glb`). Verifikasi ulang dengan unduhan resmi
   kalau sempat.
 - Rig: UE mannequin (`root`, `pelvis`, `Head`, `hand_r`, ...), sama dengan Modular Character Outfits.
+- Rambut (2026-11-27): `Hair_SimpleParted`, `Hair_Buzzed`, `Hair_Long`, `Hair_Beard` (versi Rigged) + `T_Hair_2_*` dari
+  paket Standard yang sama (`Hairstyles/Rigged/` di mirror `kirbycope/godot-3d-player-controller-v2`). Di-bind ulang
+  ke skeleton badan seperti outfit. Warna dari pewarna part `hair` (bawaan hitam).
