@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { b64encode, EMPTY_DEPTH, MAX_PARTS, MAX_SHADES, packCell, type BakeFile, type BladeSocket, type FrameData, type SocketPoint } from '../shared/format';
 import { buildGlyphSet, makeMatcher, DIMS, REG_X, REG_Y } from './glyphs';
+import { Cloth, type ClothSpec } from './cloth';
 
 export interface LayerDef {
   label: string;
@@ -104,6 +105,8 @@ export interface BakeParams {
    */
   overlays?: Record<string, PoseOverlay>;
   attachments?: Attachment[];
+  /** mesh kain yang disimulasikan saat bake (lihat cloth.ts). */
+  cloth?: ClothSpec[];
   /**
    * Outfit skinned dengan rig yang sama (mis. Quaternius Modular Outfits di atas Universal Base Characters).
    * Mesh-nya di-bind ulang ke skeleton model utama, jadi ikut animasi yang sama.
@@ -175,6 +178,24 @@ export const DEFAULT_PARAMS: BakeParams = {
   // (kepalan), jadi pedang tetap di tangan dan tidak terayun ke belakang saat walk.
   overlays: { idle: SWORD_ARM, walk: SWORD_ARM },
   clips: { idle: 'idle', walk: 'walk' },
+  // Jubah disimulasikan sebagai kain (2 baris atas dipaku ke dada). Walk in-place → angin semu 1,3 m/s.
+  cloth: [
+    {
+      mesh: 'cloak:Cloth',
+      cols: 25,
+      pinRows: 2,
+      shape: 0.6,
+      wind: { walk: 1.3 },
+      colliders: [
+        { from: 'pelvis', to: 'spine_01', radius: 0.15 },
+        { from: 'spine_01', to: 'spine_03', radius: 0.16 },
+        ...(['l', 'r'] as const).flatMap((s) => [
+          { from: `thigh_${s}`, to: `calf_${s}`, radius: 0.13 },
+          { from: `calf_${s}`, to: `foot_${s}`, radius: 0.1 },
+        ]),
+      ],
+    },
+  ],
   outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`],
   outfitInflate: 0.02,
   attachments: [
@@ -393,6 +414,7 @@ export interface BakeContext {
   mixer: THREE.AnimationMixer;
   animations: THREE.AnimationClip[];
   meshes: Map<string, THREE.Object3D>;
+  cloth: Cloth[];
 }
 
 const loadAny = async (url: string): Promise<{ scene: THREE.Object3D; animations: THREE.AnimationClip[] }> => {
@@ -508,7 +530,7 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     });
   }
 
-  return {
+  const ctx: BakeContext = {
     renderer,
     scene,
     camera: new THREE.OrthographicCamera(),
@@ -516,7 +538,11 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     mixer: new THREE.AnimationMixer(root),
     animations,
     meshes,
+    cloth: [],
   };
+  root.updateMatrixWorld(true);
+  ctx.cloth = (p.cloth ?? []).map((c) => new Cloth(ctx, c));
+  return ctx;
 }
 
 function setVisible(ctx: BakeContext, names: Set<string> | null) {
@@ -531,6 +557,7 @@ function poseAt(ctx: BakeContext, clipName: string, t: number) {
   action.reset().play();
   ctx.mixer.setTime(t);
   ctx.root.updateMatrixWorld(true);
+  for (const c of ctx.cloth) c.apply(clipName, t);
   return clip;
 }
 
