@@ -110,6 +110,13 @@ $('save').onclick = async () => {
   renderer.render(ctx.scene, ctx.camera);
   return canvas.toDataURL();
 };
+// Posisi tulang (ruang model, sebelum animasi) untuk merancang aset prosedural: window.__bones() → {nama: [x,y,z]}.
+const rest = new Map<string, number[]>();
+ctx.root.updateMatrixWorld(true);
+ctx.root.traverse((o) => {
+  if ((o as THREE.Bone).isBone) rest.set(o.name, ctx.root.worldToLocal(o.getWorldPosition(new THREE.Vector3())).toArray());
+});
+(window as unknown as Record<string, unknown>).__bones = () => Object.fromEntries(rest);
 // Inspeksi dekat satu tulang (mis. cek helm menembus kepala): window.__closeup('Head', yaw, layers?, size?) → dataURL.
 (window as unknown as Record<string, unknown>).__closeup = (bone: string, yaw: number, layers?: string[], size = 0.5) => {
   const p = readParams();

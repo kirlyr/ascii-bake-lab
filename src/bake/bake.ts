@@ -51,6 +51,8 @@ export interface Attachment {
   scale: number | [number, number, number];
   /** derajat. Putar aksesori di sumbu panjangnya (Y setelah node -90° X) sebelum `rotation`. */
   spin?: number;
+  /** true = mesh dibuat di ruang model saat rest pose (bukan ruang tulang); position/rotation/scale diabaikan. */
+  rest?: boolean;
 }
 
 export interface PoseOverlay {
@@ -193,6 +195,18 @@ export const DEFAULT_PARAMS: BakeParams = {
     { name: 'cloak', url: '/assets/models/cloak/Cloak.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
     // Sayap bulu buatan sendiri (assets/models/wings/make_wings.py), sudah Y-atas dalam meter. Satu slot dengan jubah.
     { name: 'wings', url: '/assets/models/wings/Wings.glb', bone: 'spine_03', position: [0, 0.02, 0], rotation: [0, 0, 0], scale: 1 },
+    // Pelat kaki + sepatu besi buatan sendiri (assets/models/greaves/make_greaves.py), dibuat di ruang model rest pose.
+    ...(['l', 'r'] as const).flatMap((s): Attachment[] =>
+      ([['thigh', 'Thigh'], ['calf', 'Greave'], ['foot', 'Sabaton']] as const).map(([bone, file]) => ({
+        name: `${file.toLowerCase()}_${s}`,
+        url: `/assets/models/greaves/${file}_${s.toUpperCase()}.glb`,
+        bone: `${bone}_${s}`,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: 1,
+        rest: true,
+      })),
+    ),
     // Bantalan bahu Knight Pack: satu mesh melintang kedua bahu, ditempel ke tulang dada atas, miring 45°.
     // Zirah dada Ultimate RPG Pack (item statis, tidak di-rig): ditempel ke tulang dada atas.
     ...['Black', 'Golden', 'Leather', 'Metal', 'Metal2'].map((m): Attachment => ({
@@ -225,6 +239,9 @@ export const DEFAULT_PARAMS: BakeParams = {
     peasant_legs: { label: 'Celana Petani', slot: 'legs', bias: 0.04, parts: { wool: ['Male_Peasant_Legs'] } },
     ranger_feet: { label: 'Sepatu Ranger', slot: 'feet', bias: 0.04, parts: { leather: ['Male_Ranger_Feet_Boots'] } },
     peasant_feet: { label: 'Sepatu Petani', slot: 'feet', bias: 0.04, parts: { wool: ['Male_Peasant_Feet'] } },
+    // Celana Ranger tetap di bawah pelat supaya celah antar pelat tidak menampakkan kulit.
+    plate_legs: { label: 'Pelat Kaki', slot: 'legs', bias: 0.04, parts: { cloth: ['Male_Ranger_Legs'], armor: ['thigh_l:Plate', 'thigh_r:Plate', 'greave_l:Plate', 'greave_r:Plate'] } },
+    plate_feet: { label: 'Sepatu Besi', slot: 'feet', bias: 0.04, parts: { armor: ['sabaton_l:Plate', 'sabaton_r:Plate'] } },
     ranger_pauldron: { label: 'Pauldron Ranger', slot: 'shoulder', bias: 0.04, parts: { armor: ['Male_Ranger_Acc_Pauldron'] } },
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
     cloak: { label: 'Cloak', slot: 'back', parts: { cloak: ['cloak:Cloth'] } },
@@ -471,10 +488,17 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     holder.name = a.name;
     holder.add(acc);
     acc.rotation.y = THREE.MathUtils.degToRad(a.spin ?? 0);
-    holder.position.fromArray(a.position);
-    holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
-    if (typeof a.scale === 'number') holder.scale.setScalar(a.scale);
-    else holder.scale.set(...a.scale);
+    if (a.rest) {
+      // Belum ada animasi: matrixWorld tulang = rest pose. holder = ruang model → ruang tulang.
+      root.updateMatrixWorld(true);
+      holder.matrixAutoUpdate = false;
+      holder.matrix.copy(bone.matrixWorld).invert().multiply(root.matrixWorld);
+    } else {
+      holder.position.fromArray(a.position);
+      holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
+      if (typeof a.scale === 'number') holder.scale.setScalar(a.scale);
+      else holder.scale.set(...a.scale);
+    }
     bone.add(holder);
     acc.traverse((o) => {
       const m = o as THREE.Mesh;
