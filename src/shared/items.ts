@@ -9,6 +9,7 @@ export const SLOTS = [
   { key: 'torso', label: 'Chest' },
   { key: 'back', label: 'Back' },
   { key: 'weapon', label: 'Weapon' },
+  { key: 'offhand', label: 'Off-hand' },
   { key: 'legs', label: 'Legs' },
   { key: 'feet', label: 'Feet' },
 ] as const;
@@ -54,6 +55,17 @@ export const ITEMS: Record<string, ItemText> = {
   axe: { name: 'Bearded Axe', kind: 'weapon · one-handed', desc: 'A woodcutter axe from the northern village, sharpened for worse work.' },
   spear: { name: 'Spear', kind: 'weapon · polearm', desc: 'Long reach, simple craft. The first weapon of every militia.' },
   hammer: { name: 'War Hammer', kind: 'weapon · heavy', desc: 'Two heads, no mercy. Built for breaking shields and doors.' },
+  claymore: { name: 'Claymore', kind: 'weapon · two-handed', desc: 'A highland greatsword with a blade the colour of old wine. Meant for both hands, carried in one out of pride.' },
+  sword_big: { name: 'Bastard Sword', kind: 'weapon · hand-and-a-half', desc: 'Longer than a longsword, lighter than a greatsword. Never quite sure what it is, always sure what it does.' },
+  sword_golden: { name: 'Gilded Sword', kind: 'weapon · one-handed', desc: 'A ceremonial blade with a gold crossguard. The edge is sharper than the courtiers expected.' },
+  dagger: { name: 'Dagger', kind: 'weapon · one-handed', desc: 'Short, quiet and always within reach. The last friend in a crowded alley.' },
+  axe_double: { name: 'Double Axe', kind: 'weapon · heavy', desc: 'Two crescent blades on a long haft. Swing it once and the room makes space.' },
+  hammer_small: { name: 'Smith Hammer', kind: 'weapon · one-handed', desc: 'Borrowed from the tavern forge and never returned. Fixes armour, and dents it too.' },
+  shield_heater: { name: 'Heater Shield', kind: 'off-hand · oak & iron', desc: 'Oak planks under an iron rim, shaped like an old flat-iron. The knight standard for a reason.' },
+  shield_heater_2: { name: 'Banded Heater', kind: 'off-hand · oak & iron', desc: 'A heater shield with an extra iron band across the middle. Heavier, and it has stopped heavier things.' },
+  shield_round: { name: 'Round Shield', kind: 'off-hand · oak & iron', desc: 'A wide circle of oak with an iron boss. Easy to make, easy to replace, hard to get past.' },
+  shield_round_2: { name: 'Painted Round Shield', kind: 'off-hand · oak & linen', desc: 'Linen glued over oak and painted pale. The paint chips, the shield does not.' },
+  shield_celtic_golden: { name: 'Celtic Shield', kind: 'off-hand · gold & enamel', desc: 'Gold knotwork around a green stone. Made for a chieftain who never planned to stand at the back.' },
   scythe: { name: 'Reaper Scythe', kind: 'weapon · heavy', desc: 'It was a farm tool once. Nobody asks what it harvests now.' },
 };
 

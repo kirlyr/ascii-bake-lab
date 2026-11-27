@@ -57,7 +57,7 @@ export type Equipment = Record<string, string | null>;
 /** Equipment awal: layer pertama tiap slot. */
 export function defaultEquipment(file: BakeFile): Equipment {
   const eq: Equipment = {};
-  for (const [k, l] of Object.entries(file.layers)) if (l.slot && !(l.slot in eq)) eq[l.slot] = k;
+  for (const [k, l] of Object.entries(file.layers)) if (l.slot && !(l.slot in eq)) eq[l.slot] = l.unequipped ? null : k;
   return eq;
 }
 

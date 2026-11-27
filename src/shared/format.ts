@@ -49,6 +49,8 @@ export interface LayerData {
   slot?: string;
   /** slot lain yang disembunyikan selama layer ini terpasang (mis. helm menutup rambut). */
   hides?: string[];
+  /** true = slot ini kosong di susunan bawaan (hanya dibaca di layer pertama slot). */
+  unequipped?: boolean;
   /**
    * Prioritas compose dalam unit depth: layer ini menang atas layer lain yang lebih dekat
    * asal selisihnya ≤ bias. Untuk armor yang ditembus badan (mesh badan sedikit lebih besar dari outfit).

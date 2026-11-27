@@ -16,6 +16,8 @@ export interface LayerDef {
   slot?: string;
   /** slot lain yang disembunyikan selama layer ini terpasang (helm menutup rambut). */
   hides?: string[];
+  /** true = slot ini kosong di susunan bawaan (mis. perisai). Hanya berlaku di layer pertama slot. */
+  unequipped?: boolean;
   /** hanya layer senjata: split hilt/blade + sumber socket blade. */
   blade?: BladeSplit;
   /** meter. Layer ini menang atas layer yang lebih dekat ≤ jarak ini (lihat LayerData.bias). */
@@ -54,7 +56,9 @@ export interface Attachment {
   scale: number | [number, number, number];
   /** derajat. Putar aksesori di sumbu panjangnya (Y setelah node -90° X) sebelum `rotation`. */
   spin?: number;
-  /** true = mesh dibuat di ruang model saat rest pose (bukan ruang tulang); position/rotation/scale diabaikan. */
+  /** posisi genggaman di sumbu panjang mesh (koordinat lokal mesh, sumbu z). Digeser ke origin = tangan. */
+  grip?: number;
+  /** true = position/rotation/scale di ruang model saat rest pose (atau `restClip`), bukan ruang tulang; tetap ikut tulang. */
   rest?: boolean;
   /**
    * Dengan `rest`: pakai pose frame 0 clip ini sebagai ruang model, bukan rest pose. Untuk benda panjang kaku
@@ -163,6 +167,8 @@ const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'].flatMap((f) => [1,
 const helm = (name: string, url: string): Attachment => ({ name, url, bone: 'Head', position: [0, 0.095, 0.0], rotation: [0, 0, 0], scale: 0.165 });
 // Dengan pose kepalan Sword_Idle: blade turun ke depan, sisi lebar menghadap kamera (Z 90°).
 const weapon = (name: string, url: string, spin = 0): Attachment => ({ name, url, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [25, 0, 90], scale: 0.22, spin });
+// Perisai: dirancang di ruang model pada pose idle (lengan kiri tergantung), muka ke luar (+X), ikut miring lengan bawah.
+const shield = (name: string, url: string): Attachment => ({ name, url, bone: 'lowerarm_l', position: [0.4, 1.03, -0.03], rotation: [-18, 90, 0], scale: 0.24, rest: true, restClip: 'idle' });
 // Modular Weapons Pack + Ultimate RPG Pack (CC0): konvensi node sama dengan Knight Pack, ukuran sedikit lebih besar.
 const W = '/assets/models/quaternius-weapons';
 const O = '/assets/models/quaternius-outfits';
@@ -228,9 +234,18 @@ export const DEFAULT_PARAMS: BakeParams = {
     { ...weapon('scythe', `${W}/Scythe.glb`, 90), scale: 0.18 },
     // Tombak dipegang tegak (seperti penjaga), ujung ke atas: grid tidak melebar 2 m ke depan.
     { ...weapon('spear', `${W}/Spear.glb`), rotation: [0, 0, 180], scale: 0.18 },
+    // Senjata tambahan Modular Weapons Pack. `grip` = tengah gagang (origin mesh ada di pangkal/tengah senjata).
+    { ...weapon('claymore', `${W}/Claymore.glb`), scale: 0.18, grip: 0.0085 },
+    { ...weapon('sword_big', `${W}/Sword_Big.glb`), scale: 0.18, grip: 0.005 },
+    { ...weapon('sword_golden', `${W}/Sword_Golden.glb`), scale: 0.18 },
+    { ...weapon('dagger', `${W}/Dagger.glb`), scale: 0.18, grip: -0.0008 },
+    { ...weapon('axe_double', `${W}/Axe_Double.glb`, 90), scale: 0.18, grip: -0.02 },
+    { ...weapon('hammer_small', `${W}/Hammer_Small.glb`), scale: 0.18 },
+    // Perisai di lengan bawah kiri, muka menghadap ke luar badan.
+    ...['Heater', 'Heater_2', 'Round', 'Round_2', 'Celtic_Golden'].map((f) => shield(`shield_${f.toLowerCase()}`, `${W}/Shield_${f}.glb`)),
     // Mahkota duduk di atas rambut, lebih besar dan lebih tinggi: pita setinggi 2 baris hanya jadi glyph tepi di ASCII.
-    { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.19, 0.01], scale: [0.31, 0.37, 0.31], matte: true },
-    { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.19, 0.01], scale: [0.31, 0.37, 0.31], matte: true },
+    { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.175, 0.01], scale: [0.26, 0.22, 0.26], matte: true },
+    { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.175, 0.01], scale: [0.26, 0.22, 0.26], matte: true },
     // Jubah buatan sendiri (assets/models/cloak/make_cloak.py), ruang model rest pose; disimulasikan (lihat `cloth`).
     { name: 'cloak', url: '/assets/models/cloak/Cloak.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
     // Sayap terlipat buatan sendiri (assets/models/wings/make_wings.py), ruang model rest pose. Satu slot dengan jubah.
@@ -351,6 +366,71 @@ export const DEFAULT_PARAMS: BakeParams = {
       slot: 'weapon',
       parts: { blade: ['scythe:Steel', 'scythe:LightSteel'], wood: ['scythe:DarkWood', 'scythe:LightWood'] },
       blade: { mesh: 'scythe:Steel', axis: 'x', at: -0.006, below: 'blade', above: 'blade' },
+    },
+    claymore: {
+      label: 'Claymore',
+      slot: 'weapon',
+      parts: { blade: ['claymore:Red', 'claymore:LightRed'], hilt: ['claymore:DarkSteel', 'claymore:Black', 'claymore:DarkBrown'] },
+      blade: { mesh: 'claymore:Red', axis: 'z', at: 0.0182, below: 'blade', above: 'blade' },
+    },
+    sword_big: {
+      label: 'Pedang Besar',
+      slot: 'weapon',
+      parts: { blade: ['sword_big:Steel', 'sword_big:LightSteel'], hilt: ['sword_big:DarkSteel', 'sword_big:DarkWood', 'sword_big:LightWood'] },
+      blade: { mesh: 'sword_big:Steel', axis: 'z', at: 0.0146, below: 'blade', above: 'blade' },
+    },
+    // Pedang emas: blade ikut forge seperti pedang lain, pelindung tangan tetap berwarna hiasan (trim).
+    sword_golden: {
+      label: 'Pedang Emas',
+      slot: 'weapon',
+      parts: { blade: ['sword_golden:Gold', 'sword_golden:LightGold'], trim: ['sword_golden:DarkSteel'], hilt: ['sword_golden:DarkWood', 'sword_golden:LightWood'] },
+      blade: { mesh: 'sword_golden:Gold', axis: 'z', at: 0.0088, below: 'blade', above: 'blade' },
+    },
+    dagger: {
+      label: 'Belati',
+      slot: 'weapon',
+      parts: { blade: ['dagger:Steel', 'dagger:LightSteel'], hilt: ['dagger:DarkSteel', 'dagger:DarkWood', 'dagger:LightWood'] },
+      blade: { mesh: 'dagger:Steel', axis: 'z', at: 0.0031, below: 'blade', above: 'blade' },
+    },
+    axe_double: {
+      label: 'Kapak Ganda',
+      slot: 'weapon',
+      parts: { blade: ['axe_double:Steel', 'axe_double:LightSteel'], wood: ['axe_double:DarkWood', 'axe_double:LightWood'] },
+      blade: { mesh: 'axe_double:Steel', axis: 'z', at: 0.007, below: 'blade', above: 'blade' },
+    },
+    // Palu kecil: mesh Steel juga berisi pangkal gagang (z < 0.012) = hilt.
+    hammer_small: {
+      label: 'Palu Kecil',
+      slot: 'weapon',
+      parts: { blade: ['hammer_small:Steel', 'hammer_small:LightSteel'], wood: ['hammer_small:DarkWood', 'hammer_small:LightWood'] },
+      blade: { mesh: 'hammer_small:Steel', axis: 'z', at: 0.012, below: 'hilt', above: 'blade' },
+    },
+    // Perisai (slot Off-hand): kosong di susunan bawaan. Logam = pelat (bisa diwarnai Plate), kayu = kayu.
+    shield_heater: {
+      label: 'Perisai Heater',
+      slot: 'offhand',
+      unequipped: true,
+      parts: { armor: ['shield_heater:Steel', 'shield_heater:LightSteel'], wood: ['shield_heater:DarkWood', 'shield_heater:LightWood'] },
+    },
+    shield_heater_2: {
+      label: 'Perisai Heater 2',
+      slot: 'offhand',
+      parts: { armor: ['shield_heater_2:Steel', 'shield_heater_2:LightSteel'], wood: ['shield_heater_2:DarkWood', 'shield_heater_2:LightWood'] },
+    },
+    shield_round: {
+      label: 'Perisai Bundar',
+      slot: 'offhand',
+      parts: { armor: ['shield_round:Steel', 'shield_round:LightSteel'], wood: ['shield_round:DarkWood', 'shield_round:LightWood'] },
+    },
+    shield_round_2: {
+      label: 'Perisai Bundar 2',
+      slot: 'offhand',
+      parts: { armor: ['shield_round_2:Steel', 'shield_round_2:LightSteel'], wood: ['shield_round_2:DarkWood', 'shield_round_2:LightWood'], linen: ['shield_round_2:White'] },
+    },
+    shield_celtic_golden: {
+      label: 'Perisai Kelt',
+      slot: 'offhand',
+      parts: { trim: ['shield_celtic_golden:Gold', 'shield_celtic_golden:LightGold'], cloth: ['shield_celtic_golden:LightBlue'], gem: ['shield_celtic_golden:Green'] },
     },
   },
   // Mesh outfit yang tidak dipakai (lengan Ranger bertumpuk dengan lengan badan, hood diganti helm).
@@ -538,6 +618,8 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     holder.name = a.name;
     holder.add(acc);
     acc.rotation.y = THREE.MathUtils.degToRad(a.spin ?? 0);
+    // Node pack Quaternius: rotasi -90° X + skala 100, jadi sumbu z mesh = sumbu y scene.
+    if (a.grip) acc.position.y = -a.grip * 100;
     if (a.rest) {
       // holder = ruang model (rest pose, atau frame 0 `restClip`) → ruang tulang.
       // Mixer sementara; stopAllAction mengembalikan tulang ke rest pose untuk attachment berikutnya.
@@ -551,6 +633,10 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
       root.updateMatrixWorld(true);
       holder.matrixAutoUpdate = false;
       holder.matrix.copy(bone.matrixWorld).invert().multiply(root.matrixWorld);
+      // position/rotation/scale di ruang model (pose itu): mis. perisai dirancang di lengan yang tergantung saat idle.
+      const s = typeof a.scale === 'number' ? new THREE.Vector3().setScalar(a.scale) : new THREE.Vector3(...a.scale);
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number])));
+      holder.matrix.multiply(new THREE.Matrix4().compose(new THREE.Vector3(...a.position), q, s));
       mixer.stopAllAction();
       mixer.uncacheRoot(root);
     } else {
@@ -972,6 +1058,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
       out.layers[layerKey] = { label: layer.label, clips: {} };
       if (layer.slot) out.layers[layerKey].slot = layer.slot;
       if (layer.hides) out.layers[layerKey].hides = layer.hides;
+      if (layer.unequipped) out.layers[layerKey].unequipped = true;
       if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
       setVisible(ctx, meshes);
       const blade = layer.blade && splits.has(layer.blade.mesh) ? bladeLocalOf(layer.blade) : null;

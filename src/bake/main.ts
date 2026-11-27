@@ -116,7 +116,20 @@ ctx.root.updateMatrixWorld(true);
 ctx.root.traverse((o) => {
   if ((o as THREE.Bone).isBone) rest.set(o.name, ctx.root.worldToLocal(o.getWorldPosition(new THREE.Vector3())).toArray());
 });
-(window as unknown as Record<string, unknown>).__bones = () => Object.fromEntries(rest);
+// window.__bones('idle') = posisi pada frame 0 clip itu (mis. merancang perisai di lengan yang tergantung).
+(window as unknown as Record<string, unknown>).__bones = (clip?: string) => {
+  if (!clip) return Object.fromEntries(rest);
+  const p = readParams();
+  ctx.mixer.stopAllAction();
+  ctx.mixer.clipAction(ctx.animations.find((a) => a.name === (p.clips[clip] ?? clip))!).reset().play();
+  ctx.mixer.setTime(0);
+  ctx.root.updateMatrixWorld(true);
+  const out: Record<string, number[]> = {};
+  ctx.root.traverse((o) => {
+    if ((o as THREE.Bone).isBone) out[o.name] = ctx.root.worldToLocal(o.getWorldPosition(new THREE.Vector3())).toArray();
+  });
+  return out;
+};
 // Inspeksi dekat satu tulang (mis. cek helm menembus kepala): window.__closeup('Head', yaw, layers?, size?, clip?, t?) → dataURL.
 // clip/t opsional: cek pose lain (mis. jubah saat berjalan), kain ikut disimulasikan.
 (window as unknown as Record<string, unknown>).__closeup = (bone: string, yaw: number, layers?: string[], size = 0.5, clip = 'idle', t = 0) => {
