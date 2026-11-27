@@ -73,23 +73,38 @@ def greave(s):
     return [(*knee, 'Plate'), (*shin, 'Plate')]
 
 
-def sabaton(s):
+def sabaton(s, k=1.0, lames=5):
     x = LEG_X * s
     z0, z1 = -0.15, 0.2  # tumit → ujung jari
 
     def point(t, u):
         z = lerp(z0, z1, t)
         h = 0.15 * (1 - t) ** 0.6 + 0.05 * t if t < 0.55 else lerp(0.105, 0.06, (t - 0.55) / 0.45)
-        w = 0.062 + 0.014 * math.sin(t * math.pi)
+        w = (0.062 + 0.014 * math.sin(t * math.pi)) * k
         # Ujung jari dan tumit ditutup membulat supaya kaki tidak terlihat dari depan/belakang.
         close = min(1.0, (1 - t) / 0.15) ** 0.5 * min(1.0, t / 0.12) ** 0.5
         w *= 0.15 + 0.85 * close
-        h *= 0.15 + 0.85 * close
+        h *= (0.15 + 0.85 * close) * (0.5 + 0.5 * k)
         a = (u - 0.5) * math.pi * 1.15  # sedikit melewati samping sampai ke sol
-        lame = sawtooth(t, 5, 0.006) if t > 0.35 else 0.0
+        lame = sawtooth(t, lames, 0.006) if t > 0.35 else 0.0
         return [x + math.sin(a) * (w + lame), max(0.0, math.cos(a)) * (h + lame) + 0.004, z]
 
     return [(*surface(20, 24, point), 'Plate')]
+
+
+def thigh_lean(s):
+    """Versi ramping: satu pelat mulus tanpa lame, hanya sisi depan (dari samping tidak melebar)."""
+    x = LEG_X * s
+    return [(*tube(x, LEG_Z, 0.88, 0.58, lambda t: lerp(0.121, 0.111, t), 170), 'Plate')]
+
+
+def greave_lean(s):
+    """Lutut kecil + pelindung tulang kering terbuka di belakang (betis tidak dibungkus penuh)."""
+    x = LEG_X * s
+    calf = lambda t: 0.068 + 0.01 * math.sin(min(t / 0.35, 1) * math.pi / 2) - 0.028 * max(0, (t - 0.35) / 0.65) ** 1.2
+    knee = tube(x, LEG_Z, 0.58, 0.49, lambda t: 0.092 - 0.025 * (2 * t - 1) ** 2, 130, forward=0.008, rows=8)
+    shin = tube(x, lambda t: lerp(LEG_Z - 0.012, -0.088, t), 0.5, 0.15, calf, 210)
+    return [(*knee, 'Plate'), (*shin, 'Plate')]
 
 
 def write_glb(path, parts, colors, name):
@@ -144,5 +159,8 @@ if __name__ == '__main__':
     colors = {'Plate': [0.62, 0.62, 0.64, 1]}
     for s, side in ((1, 'L'), (-1, 'R')):
         for name, fn in (('Thigh', thigh), ('Greave', greave), ('Sabaton', sabaton)):
+            write_glb(here / f'{name}_{side}.glb', fn(s), colors, f'{name}_{side}')
+        # Set ramping (lean): pelat lebih tipis menempel, sepatu besi lebih langsing dengan lame lebih sedikit.
+        for name, fn in (('ThighLean', thigh_lean), ('GreaveLean', greave_lean), ('SabatonLean', lambda s: sabaton(s, 0.88, 3))):
             write_glb(here / f'{name}_{side}.glb', fn(s), colors, f'{name}_{side}')
     print('ok')

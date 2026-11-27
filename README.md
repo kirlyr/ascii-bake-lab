@@ -65,12 +65,15 @@ dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
 
 | Slot | Varian | Part |
 |---|---|---|
-| Baju | Rompi Ranger, Tunik Petani | cloth, leather, linen |
-| Celana | Celana Ranger, Celana Petani | cloth, wool |
-| Sepatu | Sepatu Ranger, Sepatu Petani | leather, wool |
+| Baju | Rompi Ranger, Tunik Petani, 5 zirah Ultimate RPG Pack, Zirah Ramping, Jubah Pengembara, Jubah Compang-camping (buatan sendiri) | cloth, leather, linen, armor, wool, cloak |
+| Celana | Celana Ranger, Celana Petani, Pelat Kaki, Pelat Kaki Ramping | cloth, wool, armor |
+| Sepatu | Sepatu Ranger, Sepatu Petani, Sepatu Besi, Sepatu Besi Ramping | leather, wool, armor |
 | Bahu | Pauldron Ranger, Bahu Ksatria (`ShoulderPads`) | armor |
-| Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`) | helmet, trim, gem |
-| Senjata | Pedang, Pedang Pendek, Katana, Gada (Knight Pack); Kapak, Tombak, Palu Perang, Sabit Maut (Modular Weapons Pack) | blade, hilt, wood |
+| Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`), Halo (buatan sendiri) | helmet, trim, gem |
+| Punggung | Jubah, Fallen Wings, Angel Wings, Broken Wings (semua buatan sendiri) | cloak, feather, plume, wood |
+| Janggut | Janggut, Janggut Panjang (helai panjang disimulasikan sebagai kain) | hair |
+| Senjata | Pedang, Pedang Pendek, Katana, Gada (Knight Pack); Kapak, Tombak, Palu Perang, Sabit Maut, Claymore, Pedang Besar, Pedang Emas, Belati, Kapak Ganda, Palu Kecil (Modular Weapons Pack); Flail (buatan sendiri) | blade, hilt, wood |
+| Off-hand | Perisai Heater, Heater 2, Bundar, Bundar 2, Kelt (Modular Weapons Pack), di lengan bawah kiri, kosong di susunan bawaan | armor, wood, trim |
 
 Outfit Ranger dan Peasant memang terdiri dari mesh terpisah per bagian, jadi bisa dipecah ke slot dan di-mix tanpa aset
 baru. Semua layer outfit memakai `bias` 4 cm (badan Superhero lebih besar dari tubuh outfit).
@@ -172,11 +175,16 @@ Satu karakter proporsi realistis (bukan chibi), tinggi 90 baris. Semua aset **CC
 | Animasi | Universal Animation Library, `Idle_Loop` + `Walk_Loop` + `Sword_Idle` (dipangkas, 540 KB) | `assets/models/quaternius-ubc/` |
 | Baju, celana, sepatu, bahu | Modular Character Outfits – Fantasy, outfit `Male_Ranger` + `Male_Peasant` | `assets/models/quaternius-outfits/` |
 | Helm, pedang, bahu | Animated Knight Pack (`Helmet1–3`, `Sword`, `ShortSword`, `Katana`, `Club`, `ShoulderPads`) | `assets/models/quaternius/` |
-| Kapak, tombak, palu, sabit, mahkota | Modular Weapons Pack + Ultimate RPG Pack | `assets/models/quaternius-weapons/` |
+| Kapak, tombak, palu, sabit, senjata tambahan, perisai, mahkota | Modular Weapons Pack + Ultimate RPG Pack | `assets/models/quaternius-weapons/` |
 | Zirah dada (5) | Ultimate RPG Pack (`Armor_*`, item statis di `spine_03`) | `assets/models/quaternius-weapons/` |
 | Jubah | buatan sendiri, prosedural (`make_cloak.py`), disimulasikan sebagai kain saat bake (`src/bake/cloth.ts`) | `assets/models/cloak/` |
 | Sayap bulu (terlipat) | buatan sendiri, prosedural (`make_wings.py`) | `assets/models/wings/` |
 | Pelat kaki + sepatu besi | buatan sendiri, prosedural (`make_greaves.py`) | `assets/models/greaves/` |
+| Sayap malaikat terbuka + sayap rusak | buatan sendiri, prosedural (`make_wings.py`) | `assets/models/wings/` |
+| Halo + janggut panjang | buatan sendiri, prosedural (`make_accessories.py`), janggut disimulasikan sebagai kain | `assets/models/accessories/` |
+| Zirah ramping | buatan sendiri, prosedural (`make_cuirass.py`) | `assets/models/cuirass/` |
+| Robe + robe compang-camping | buatan sendiri, prosedural (`make_robe.py`), rok kain tabung (`wrap`, `axis: pelvis`) | `assets/models/robe/` |
+| Flail | buatan sendiri, prosedural (`make_flail.py`), rantai disimulasikan Verlet saat bake (`src/bake/flail.ts`) | `assets/models/flail/` |
 
 Sumber unduhan dan catatan lisensi ada di `SOURCE.md` tiap folder (diambil dari mirror GitHub karena situs Quaternius
 tidak bisa diakses dari cloud). Versi gratis Modular Outfits hanya berisi Ranger dan Peasant; outfit armor penuh ada di
@@ -199,8 +207,8 @@ Perbaikan karakter (PR #5):
 | | |
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
-| `hero.bake` | 36 layer × 2 clip = **350 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
-| `hero-turn.bake` | 16 arah × 36 layer × 4 frame = **605 KB** (22 layer: 342 KB) |
+| `hero.bake` | 59 layer × 2 clip = **516 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
+| `hero-turn.bake` | 16 arah × 59 layer × 4 frame = **890 KB** (grid 162 kolom: sayap malaikat) (22 layer: 342 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan

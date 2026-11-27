@@ -55,6 +55,7 @@ export const DEFAULT_LOOK: Record<string, MaterialKey> = {
   trim: 'brass',
   cloak: 'wool',
   feather: 'linen',
+  plume: 'linen',
   hair: 'hair',
 };
 
@@ -104,6 +105,7 @@ export const DYEABLE: Record<string, { label: string; palette: Record<string, Ma
   trim: { label: 'Trim', palette: FINISHES, initial: 'gold' },
   cloak: { label: 'Cloak', palette: DYES, initial: 'charcoal' },
   feather: { label: 'Feather', palette: DYES, initial: 'raven' },
+  plume: { label: 'Plumage', palette: DYES, initial: 'snow' },
   hair: { label: 'Hair', palette: HAIR_DYES, initial: 'black' },
 };
 
