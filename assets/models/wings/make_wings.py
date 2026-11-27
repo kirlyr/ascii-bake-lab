@@ -32,13 +32,14 @@ def bend(p):
     return [p[0] * 0.85, p[1], p[2] + 0.05 * max(0.0, (ax - 0.07) / 0.22) ** 1.6]
 
 
-def feather(root, tip, width, out, ragged=False, seg=12, twist=0.0):
+def feather(root, tip, width, out, ragged=False, seg=12, twist=0.0, curve=True):
     """Helai bulu dari root ke tip. out = arah ke luar permukaan (menjauhi badan).
     Return (verts, norms, idx, material, colors). Warna vertex = gradasi terang-gelap (bukan warna akhir: warna
     dari pewarna part `feather` di runtime, gradasi ini masuk ke shade level lewat `albedo` bake):
     pangkal gelap, tengah terang, ujung meredup, tulang bulu lebih terang, belang serat tipis, tiap helai beda nada.
     Tepi helai melengkung ke arah badan (cekung) supaya cahaya jatuh berbeda di kiri-kanan tulang bulu."""
-    root, tip = bend(root), bend(tip)
+    if curve:
+        root, tip = bend(root), bend(tip)
     d = [tip[k] - root[k] for k in range(3)]
     side = norm(cross(d, out))
     # Miring seperti genteng: tepi luar helai terangkat, jadi tiap helai punya sisi terang dan bayangan sendiri.
@@ -137,6 +138,62 @@ def wing(s):
     return parts
 
 
+def spread_wing(s, skel, fan, prim_len, sec_len, keep=1.0, ragged=0.0, shrink=1.0, bone_r=1.0, wide=1.0, sweep=0.05, n=13):
+    """Sayap terbuka/terkulai: tulang S→E→W→H, primer mengipas dari W→H, sekunder tergantung dari E→W.
+    fan = (sudut primer pertama, terakhir) dalam derajat dari horizontal ke luar (+ = ke atas).
+    keep = peluang tiap bulu tetap ada (bulu rontok), ragged = peluang bulu robek, shrink = skala panjang bulu
+    (bulu patah), wide = skala lebar helai, sweep = ujung bulu condong ke belakang (volume dari samping).
+    Tidak memakai `bend`: sayap terbuka berada di belakang dan di atas lengan."""
+    X = lambda p: [p[0] * s, p[1], p[2]]
+    S, E, W, H = (X(p) for p in skel)
+    out = [0, 0, -1]
+    parts = [(*bone(S, E, 0.022 * bone_r), 'Bone'), (*bone(E, W, 0.018 * bone_r), 'Bone'), (*bone(W, H, 0.015 * bone_r), 'Bone')]
+    tw = 20 * s
+    f = lambda r, tip, w, rag=False: feather(r, tip, w * wide, out, ragged=rag or random.random() < ragged, twist=tw, curve=False)
+    def tip_at(r, length, a, back=sweep):
+        a = math.radians(a)
+        return [r[0] + s * length * math.cos(a), r[1] + length * math.sin(a), r[2] - back * length]
+    # Primer: paling panjang, mengipas. Pangkal paling dalam (z lebih depan) supaya tertutup sekunder/penutup.
+    for i in range(n):
+        t = i / (n - 1)
+        if random.random() > keep:
+            continue
+        r = lerp3(W, H, t)
+        r[2] += 0.02 + 0.002 * i
+        a = fan[0] + (fan[1] - fan[0]) * t + random.uniform(-3, 3)
+        length = prim_len * (0.8 + 0.25 * math.sin(math.pi * min(1.0, t * 1.2))) * random.uniform(0.94, 1.04)
+        length *= shrink if random.random() < 0.5 else 1.0
+        parts.append(f(r, tip_at(r, length, a), 0.065))
+    # Sekunder: dari lengan bawah, tergantung ke bawah sedikit ke luar.
+    for i in range(14):
+        t = i / 13
+        if random.random() > keep:
+            continue
+        r = lerp3(E, W, t)
+        r[2] -= 0.03
+        length = sec_len * (0.85 + 0.2 * t) * random.uniform(0.92, 1.05)
+        length *= shrink if random.random() < 0.5 else 1.0
+        parts.append(f(r, tip_at(r, length, fan[0] - 8 + 6 * t), 0.07))
+    # Bulu penutup: dua baris lebih pendek di atas sekunder/primer, paling luar.
+    for row, (frac, dz) in enumerate(((0.42, -0.06), (0.24, -0.085))):
+        for i in range(12):
+            t = i / 11
+            if random.random() > keep:
+                continue
+            r = lerp3(S, W, t) if row else lerp3(E, H, t)
+            r = [r[0], r[1] + 0.015, r[2] + dz]
+            a = (fan[0] - 4 + (fan[1] - fan[0]) * 0.35 * t) if not row else fan[0] - 2
+            parts.append(f(r, tip_at(r, sec_len * frac * random.uniform(0.85, 1.1), a, sweep * 0.4), 0.055))
+    # Skapular: dari bahu ke siku, menutup pangkal di punggung.
+    for i in range(6):
+        if random.random() > keep:
+            continue
+        r = lerp3(S, E, i / 5)
+        r[2] -= 0.05
+        parts.append(f(r, [r[0], r[1] - sec_len * 0.45, r[2] - 0.02], 0.05))
+    return parts
+
+
 def write_glb(path, parts, colors):
     mats = sorted({p[3] for p in parts})
     bin_ = bytearray()
@@ -186,6 +243,23 @@ def write_glb(path, parts, colors):
 
 if __name__ == '__main__':
     here = Path(sys.argv[0]).resolve().parent
+    colors = {'Feather': [0.5, 0.49, 0.46, 1], 'Bone': [0.4, 0.38, 0.35, 1]}
     parts = wing(1) + wing(-1)
-    write_glb(here / 'Wings.glb', parts, {'Feather': [0.5, 0.49, 0.46, 1], 'Bone': [0.4, 0.38, 0.35, 1]})
-    print('ok', len(parts), 'pieces')
+    write_glb(here / 'Wings.glb', parts, colors)
+    print('Wings', len(parts), 'pieces')
+    # Sayap malaikat: terbuka setengah dan terangkat (mekar), ujung primer menjulang di atas kepala.
+    random.seed(11)
+    # Rentang ±0,85 m: lebih lebar dari itu, sayap terpotong di panggung Tavern saat dilihat dari depan.
+    up = ([0.08, 1.4, -0.15], [0.22, 1.6, -0.3], [0.32, 1.78, -0.42], [0.39, 1.84, -0.48])
+    angel = dict(fan=(-86, 34), prim_len=0.52, sec_len=0.64, wide=1.3, sweep=0.26, n=17)
+    parts = spread_wing(1, up, **angel) + spread_wing(-1, up, **angel)
+    write_glb(here / 'WingsAngel.glb', parts, colors)
+    print('WingsAngel', len(parts), 'pieces')
+    # Sayap rusak: kiri layu (terkulai, banyak bulu robek), kanan patah di pergelangan (bulu rontok dan patah).
+    random.seed(13)
+    limp = ([0.08, 1.4, -0.15], [0.22, 1.38, -0.26], [0.34, 1.14, -0.31], [0.37, 1.02, -0.32])
+    snapped = ([0.08, 1.4, -0.15], [0.34, 1.66, -0.3], [0.31, 1.3, -0.46], [0.3, 1.16, -0.48])  # siku mencuat, tangan patah ke bawah
+    parts = spread_wing(1, limp, (-100, -62), 0.6, 0.5, keep=0.8, ragged=0.75, shrink=0.75)
+    parts += spread_wing(-1, snapped, (-95, -40), 0.58, 0.5, keep=0.35, ragged=0.9, shrink=0.55, bone_r=1.5)
+    write_glb(here / 'WingsBroken.glb', parts, colors)
+    print('WingsBroken', len(parts), 'pieces')

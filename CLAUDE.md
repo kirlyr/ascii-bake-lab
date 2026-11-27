@@ -55,8 +55,11 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Rambut (2026-11-27, user pilih): rambut UBC gratis (Simple Parted bawaan, Buzzed, Long) + janggut, slot Hair/Beard, pewarna rambut (bawaan hitam). Helm besi `hides: [hair]`; mahkota tidak.
 - Equipment batch 1 (2026-11-27, user minta): mahkota diperkecil/dipendekkan, slot baru Off-hand (`offhand`, 5 perisai
   Quaternius CC0 di lengan kiri, kosong di susunan bawaan lewat `unequipped`), 6 senjata Quaternius CC0 tambahan.
-  Rencana berikutnya: sayap malaikat mekar + sayap rusak, janggut panjang, halo, robe ×2, zirah/pelat ramping, flail
-  (semua buatan sendiri; user pilih buat sendiri, bukan pack berbayar).
+  Batch 2–4 (buatan sendiri, user pilih bukan pack berbayar): sayap malaikat terbuka (part `plume`, putih) + sayap
+  rusak (`make_wings.py`), halo (part `trim`) + janggut panjang (kain disimulasikan, `make_accessories.py`), zirah
+  ramping (`make_cuirass.py`), robe + robe compang-camping (rok kain tabung `wrap`, dorongan radial `axis: pelvis`,
+  `make_robe.py`), pelat kaki/sepatu ramping (`make_greaves.py`). Format sel penuh: 16 part (jangan tambah part).
+  Panggung Tavern memotong sisi kanvas, bukan mengecilkan karakter (grid putar 162 kolom). Berikutnya: flail.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)

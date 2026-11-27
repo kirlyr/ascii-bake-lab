@@ -65,11 +65,13 @@ dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
 
 | Slot | Varian | Part |
 |---|---|---|
-| Baju | Rompi Ranger, Tunik Petani | cloth, leather, linen |
-| Celana | Celana Ranger, Celana Petani | cloth, wool |
-| Sepatu | Sepatu Ranger, Sepatu Petani | leather, wool |
+| Baju | Rompi Ranger, Tunik Petani, 5 zirah Ultimate RPG Pack, Zirah Ramping, Jubah Pengembara, Jubah Compang-camping (buatan sendiri) | cloth, leather, linen, armor, wool, cloak |
+| Celana | Celana Ranger, Celana Petani, Pelat Kaki, Pelat Kaki Ramping | cloth, wool, armor |
+| Sepatu | Sepatu Ranger, Sepatu Petani, Sepatu Besi, Sepatu Besi Ramping | leather, wool, armor |
 | Bahu | Pauldron Ranger, Bahu Ksatria (`ShoulderPads`) | armor |
-| Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`) | helmet, trim, gem |
+| Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`), Halo (buatan sendiri) | helmet, trim, gem |
+| Punggung | Jubah, Fallen Wings, Angel Wings, Broken Wings (semua buatan sendiri) | cloak, feather, plume, wood |
+| Janggut | Janggut, Janggut Panjang (helai panjang disimulasikan sebagai kain) | hair |
 | Senjata | Pedang, Pedang Pendek, Katana, Gada (Knight Pack); Kapak, Tombak, Palu Perang, Sabit Maut, Claymore, Pedang Besar, Pedang Emas, Belati, Kapak Ganda, Palu Kecil (Modular Weapons Pack) | blade, hilt, wood |
 | Off-hand | Perisai Heater, Heater 2, Bundar, Bundar 2, Kelt (Modular Weapons Pack), di lengan bawah kiri, kosong di susunan bawaan | armor, wood, trim |
 
@@ -200,8 +202,8 @@ Perbaikan karakter (PR #5):
 | | |
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
-| `hero.bake` | 47 layer × 2 clip = **432 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
-| `hero-turn.bake` | 16 arah × 47 layer × 4 frame = **752 KB** (22 layer: 342 KB) |
+| `hero.bake` | 58 layer × 2 clip = **508 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
+| `hero-turn.bake` | 16 arah × 58 layer × 4 frame = **879 KB** (grid 162 kolom: sayap malaikat) (22 layer: 342 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan

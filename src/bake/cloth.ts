@@ -14,6 +14,8 @@ export interface ClothSpec {
   mesh: string;
   /** jumlah vertex per baris grid. */
   cols: number;
+  /** true = tabung tertutup: kolom terakhir bersebelahan dengan kolom pertama (rok robe). */
+  wrap?: boolean;
   pinRows: number;
   /** tarikan ke bentuk kaku per detik di baris paling bawah (atas lebih kaku). 0 = kain bebas. */
   shape: number;
@@ -23,6 +25,11 @@ export interface ClothSpec {
   wind?: Record<string, number>;
   /** kapsul tabrakan: dua tulang + radius (m). */
   colliders: { from: string; to: string; radius: number }[];
+  /**
+   * Tulang poros (mis. `pelvis`). Vertex yang masuk kapsul didorong mendatar menjauhi garis vertikal tulang ini,
+   * bukan ke titik terdekat kapsul: rok tetap di depan kaki yang melangkah, tidak terlempar ke belakang kaki.
+   */
+  axis?: string;
 }
 
 const DT = 1 / 120;
@@ -38,6 +45,7 @@ export class Cloth {
   private links: [number, number, number][] = [];
   private cache = new Map<string, { samples: Float32Array[]; duration: number }>();
   private bones: [THREE.Object3D, THREE.Object3D, number][];
+  private axis?: THREE.Object3D;
 
   constructor(
     private ctx: BakeContext,
@@ -56,12 +64,15 @@ export class Cloth {
     const at = (r: number, c: number) => r * C + c;
     const v = (i: number) => new THREE.Vector3().fromArray(this.rest, i * 3);
     const link = (a: number, b: number) => this.links.push([a, b, v(a).distanceTo(v(b))]);
+    // Tetangga kolom: dengan `wrap`, kolom terakhir tersambung ke kolom pertama.
+    const col = (c: number) => (spec.wrap ? c % C : c < C ? c : -1);
     for (let r = 0; r < this.rows; r++)
       for (let c = 0; c < C; c++) {
-        if (c + 1 < C) link(at(r, c), at(r, c + 1));
+        const c1 = col(c + 1), c2 = col(c + 2);
+        if (c1 >= 0) link(at(r, c), at(r, c1));
         if (r + 1 < this.rows) link(at(r, c), at(r + 1, c));
-        if (r + 1 < this.rows && c + 1 < C) link(at(r, c), at(r + 1, c + 1)), link(at(r, c + 1), at(r + 1, c));
-        if (c + 2 < C) link(at(r, c), at(r, c + 2));
+        if (r + 1 < this.rows && c1 >= 0) link(at(r, c), at(r + 1, c1)), link(at(r, c1), at(r + 1, c));
+        if (c2 >= 0) link(at(r, c), at(r, c2));
         if (r + 2 < this.rows) link(at(r, c), at(r + 2, c));
       }
     const bone = (name: string) => {
@@ -70,6 +81,7 @@ export class Cloth {
       return b;
     };
     this.bones = spec.colliders.map((k) => [bone(k.from), bone(k.to), k.radius]);
+    if (spec.axis) this.axis = bone(spec.axis);
   }
 
   /** Posisi kaku (dunia) semua vertex pada pose sekarang. */
@@ -110,6 +122,7 @@ export class Cloth {
     }
     const a = new THREE.Vector3(), b = new THREE.Vector3(), ab = new THREE.Vector3(), p = new THREE.Vector3(), q = new THREE.Vector3();
     const caps = this.bones.map(() => [new THREE.Vector3(), new THREE.Vector3()]);
+    const axisPos = new THREE.Vector3(), dir = new THREE.Vector3(), rel = new THREE.Vector3();
     const samples: Float32Array[] = [];
 
     for (let s = 0; s < steps * (WARMUP + 1); s++) {
@@ -117,6 +130,7 @@ export class Cloth {
       pose((s % steps) * dt);
       this.targets(target);
       this.bones.forEach(([f, t], k) => (f.getWorldPosition(caps[k][0]), t.getWorldPosition(caps[k][1])));
+      this.axis?.getWorldPosition(axisPos);
       // Integrasi Verlet + gravitasi + hambatan udara relatif terhadap angin semu (-Z model = belakang).
       for (let i = pinned; i < this.n; i++) {
         const o = i * 3;
@@ -154,7 +168,14 @@ export class Cloth {
             const t = Math.min(1, Math.max(0, q.subVectors(p, a).dot(ab) / ll));
             q.copy(a).addScaledVector(ab, t);
             const d = p.distanceTo(q);
-            if (d < R) p.sub(q).multiplyScalar(R / (d || 1e-6)).add(q).toArray(x, i * 3);
+            if (d >= R) continue;
+            if (this.axis) {
+              // Dorong mendatar menjauhi poros sampai menyentuh permukaan kapsul: |p + s·dir − q| = R.
+              dir.set(p.x - axisPos.x, 0, p.z - axisPos.z).normalize();
+              rel.subVectors(p, q);
+              const bb = rel.dot(dir), cc = rel.lengthSq() - R * R;
+              p.addScaledVector(dir, -bb + Math.sqrt(Math.max(0, bb * bb - cc))).toArray(x, i * 3);
+            } else p.sub(q).multiplyScalar(R / (d || 1e-6)).add(q).toArray(x, i * 3);
           }
         }
       }

@@ -36,7 +36,10 @@ a { color:var(--gold); }
 .slot-label { position:absolute; top:2px; left:6px; font-size:11px; color:var(--muted); }
 .slot .empty { color:var(--border); }
 .slot.drop-ok { border-style:dashed; border-color:var(--gold); }
-.stage-wrap { display:flex; flex-direction:column; align-items:center; gap:6px; border:1px solid transparent; }
+/* Grid putar selebar item terlebar (mis. sayap terbuka). Canvas tidak diperkecil supaya ukuran karakter tetap sama:
+   sisi kiri-kanan yang kosong dipotong, karakter tetap di tengah. */
+.stage-wrap { display:flex; flex-direction:column; align-items:center; gap:6px; border:1px solid transparent; overflow:hidden; min-width:0; }
+.stage-wrap #stage { max-width:none; flex-shrink:0; }
 .turn { align-items:center; }
 #stage { max-width:100%; height:auto !important; }
 .bag-head { display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:1px solid var(--border); padding-top:10px; }

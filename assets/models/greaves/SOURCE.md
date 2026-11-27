@@ -5,3 +5,5 @@
 - Versi gratis Modular Character Outfits Quaternius tidak berisi pelat kaki; versi Source berbayar tidak dipakai.
 - Tiap potongan kaku dan ditempel ke satu tulang (thigh/calf/foot), dibuat di ruang model rest pose (`rest: true`).
 - Warna dasar abu-abu besi; warna akhir dari pewarna part `armor` (Plate) di runtime.
+- Set ramping (`ThighLean`, `GreaveLean`, `SabatonLean`): pelat paha mulus hanya sisi depan, pelindung tulang kering
+  terbuka di belakang, sepatu besi lebih langsing dengan 3 lame.
