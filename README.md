@@ -173,6 +173,8 @@ Satu karakter proporsi realistis (bukan chibi), tinggi 90 baris. Semua aset **CC
 | Baju, celana, sepatu, bahu | Modular Character Outfits – Fantasy, outfit `Male_Ranger` + `Male_Peasant` | `assets/models/quaternius-outfits/` |
 | Helm, pedang, bahu | Animated Knight Pack (`Helmet1–3`, `Sword`, `ShortSword`, `Katana`, `Club`, `ShoulderPads`) | `assets/models/quaternius/` |
 | Kapak, tombak, palu, sabit, mahkota | Modular Weapons Pack + Ultimate RPG Pack | `assets/models/quaternius-weapons/` |
+| Zirah dada (5) | Ultimate RPG Pack (`Armor_*`, item statis di `spine_03`) | `assets/models/quaternius-weapons/` |
+| Sayap | buatan sendiri, prosedural (`make_wings.py`) | `assets/models/wings/` |
 
 Sumber unduhan dan catatan lisensi ada di `SOURCE.md` tiap folder (diambil dari mirror GitHub karena situs Quaternius
 tidak bisa diakses dari cloud). Versi gratis Modular Outfits hanya berisi Ranger dan Peasant; outfit armor penuh ada di
@@ -190,13 +192,13 @@ Perbaikan karakter (PR #5):
 
 ![sebelum dan sesudah](docs/media/hero-before-after.png)
 
-## Hasil saat ini (hero, 22 layer × 2 clip @12fps)
+## Hasil saat ini (hero, 28 layer × 2 clip @12fps)
 
 | | |
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
-| `hero.bake` | **195 KB** (JSON base64 + gzip sebelumnya: 280 KB) |
-| `hero-turn.bake` | 16 arah × 22 layer × 4 frame = **342 KB** (9 arah + mirror sebelumnya: 195 KB) |
+| `hero.bake` | 28 layer × 2 clip = **280 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
+| `hero-turn.bake` | 16 arah × 28 layer × 4 frame = **493 KB** (22 layer: 342 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan

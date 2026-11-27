@@ -49,6 +49,8 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   penuh, 342 KB. Mirror hanya untuk berjalan ke arah sebaliknya.
 - Home bisa diputar (2026-11-27, user minta): `hero-turn.bake` dimuat setelah karakter tampil. Logika putar bersama di
   `src/shared/turn.ts`. Efek rune/aura: halo bloom + glyph besar, level Faint/Bright/Radiant per efek (user minta).
+- Equipment tambahan (2026-11-27, user minta): helm diperbesar (tidak menembus kepala), 5 zirah dada CC0 di slot Chest,
+  sayap bulu prosedural (buatan sendiri) di slot Shoulders. Legs/feet: versi gratis Quaternius sudah habis terpakai.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)

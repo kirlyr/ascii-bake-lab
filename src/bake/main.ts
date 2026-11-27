@@ -110,3 +110,27 @@ $('save').onclick = async () => {
   renderer.render(ctx.scene, ctx.camera);
   return canvas.toDataURL();
 };
+// Inspeksi dekat satu tulang (mis. cek helm menembus kepala): window.__closeup('Head', yaw, layers?, size?) → dataURL.
+(window as unknown as Record<string, unknown>).__closeup = (bone: string, yaw: number, layers?: string[], size = 0.5) => {
+  const p = readParams();
+  showLayers(p, layers);
+  ctx.mixer.stopAllAction();
+  ctx.mixer.clipAction(ctx.animations.find((a) => a.name === p.clips.idle)!).reset().play();
+  ctx.mixer.setTime(0);
+  ctx.root.updateMatrixWorld(true);
+  const target = ctx.root.getObjectByName(bone)!.getWorldPosition(new THREE.Vector3());
+  const cam = new THREE.OrthographicCamera(-size / 2, size / 2, size / 2, -size / 2, 0.01, 20);
+  const r = (yaw * Math.PI) / 180;
+  cam.position.set(target.x - Math.sin(r) * 5, target.y, target.z + Math.cos(r) * 5);
+  cam.lookAt(target);
+  const prev = renderer.getSize(new THREE.Vector2());
+  renderer.setSize(400, 400, false);
+  const lights = [new THREE.HemisphereLight(0xffffff, 0x404040, 2.5), new THREE.DirectionalLight(0xffffff, 2)];
+  lights[1].position.copy(cam.position).add(new THREE.Vector3(0, 3, 0));
+  ctx.scene.add(...lights);
+  renderer.render(ctx.scene, cam);
+  ctx.scene.remove(...lights);
+  const url = canvas.toDataURL();
+  renderer.setSize(prev.x, prev.y, false);
+  return url;
+};
