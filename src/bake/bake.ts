@@ -61,6 +61,8 @@ export interface Attachment {
    * (sayap): kemiringan tulang di rest pose ikut membesar di ujungnya, jadi bentuknya dibuat di pose yang terlihat.
    */
   restClip?: string;
+  /** true = metalness 0. Tanpa env map, logam hanya menggelapkan diffuse: benda kecil seperti mahkota jadi glyph redup. */
+  matte?: boolean;
 }
 
 export interface PoseOverlay {
@@ -226,8 +228,9 @@ export const DEFAULT_PARAMS: BakeParams = {
     { ...weapon('scythe', `${W}/Scythe.glb`, 90), scale: 0.18 },
     // Tombak dipegang tegak (seperti penjaga), ujung ke atas: grid tidak melebar 2 m ke depan.
     { ...weapon('spear', `${W}/Spear.glb`), rotation: [0, 0, 180], scale: 0.18 },
-    { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
-    { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
+    // Mahkota duduk di atas rambut, lebih besar dan lebih tinggi: pita setinggi 2 baris hanya jadi glyph tepi di ASCII.
+    { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.19, 0.01], scale: [0.31, 0.37, 0.31], matte: true },
+    { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.19, 0.01], scale: [0.31, 0.37, 0.31], matte: true },
     // Jubah buatan sendiri (assets/models/cloak/make_cloak.py), ruang model rest pose; disimulasikan (lihat `cloth`).
     { name: 'cloak', url: '/assets/models/cloak/Cloak.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
     // Sayap terlipat buatan sendiri (assets/models/wings/make_wings.py), ruang model rest pose. Satu slot dengan jubah.
@@ -293,8 +296,8 @@ export const DEFAULT_PARAMS: BakeParams = {
     helmet1: { bias: 0.02, hides: ['hair'], label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
     helmet2: { bias: 0.02, hides: ['hair'], label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
     helmet3: { bias: 0.02, hides: ['hair'], label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
-    crown: { label: 'Mahkota', slot: 'helmet', parts: { trim: ['crown:Gold'] } },
-    crown2: { label: 'Mahkota Rubi', slot: 'helmet', parts: { trim: ['crown2:Gold'], gem: ['crown2:Red'] } },
+    crown: { label: 'Mahkota', slot: 'helmet', bias: 0.03, parts: { trim: ['crown:Gold'] } },
+    crown2: { label: 'Mahkota Rubi', slot: 'helmet', bias: 0.03, parts: { trim: ['crown2:Gold'], gem: ['crown2:Red'] } },
     // Pedang Quaternius: blade sudah mesh terpisah, sumbu lokal +Z. `at` = pangkal blade (sumber socket).
     sword: {
       label: 'Pedang',
@@ -560,6 +563,7 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     acc.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
+      if (a.matte) (m.material as THREE.MeshStandardMaterial).metalness = 0;
       m.name = `${a.name}:${(m.material as THREE.Material).name}`;
       meshes.set(m.name, m);
     });
