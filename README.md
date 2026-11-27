@@ -88,14 +88,14 @@ sel kosong atau layer lain), bukan di socket blade. Compose kini mencatat layer 
 `edgeCells()` mengambil tepinya tiap frame. Tanpa bake ulang dan tanpa menambah ukuran file. Per slot bisa dipilih
 satu aura: Bara, Suci, Es, Bayangan, Racun (`AURAS` di `runes.ts`). Mati total saat `prefers-reduced-motion`.
 
-## Memutar karakter (16 arah, pose diam)
+## Memutar karakter (16 arah, idle napas)
 
-Preset `hero-turn` (`/bake.html?model=hero-turn`) mem-bake frame 0 idle dari 9 arah (`views`: 0°, −22,5° … −180°),
+Preset `hero-turn` (`/bake.html?model=hero-turn`) mem-bake **4 frame idle** (merata sepanjang clip, `stillFrames: 4`) dari 9 arah (`views`: 0°, −22,5° … −180°),
 semua layer equipment, ke `public/baked/hero-turn.json` (`TurnFile`). 7 arah lainnya = mirror. Semua arah berbagi
 framing, rentang depth, dan auto-level; grid dipusatkan ke origin model supaya karakter tidak bergeser saat diputar.
 
 Player: drag karakter atau tombol ⟲ ⟳ (per 22,5°). Arah samping (±90°) memakai `hero.json` yang beranimasi
-(idle/walk); arah lain pose diam. Kedua file disejajarkan lewat `origin` (titik antara kaki, di grid) yang kini
+(idle/walk); arah lain memutar 4 frame idle itu (±1,6 fps, satu siklus napas 2,5 detik). Kedua file disejajarkan lewat `origin` (titik antara kaki, di grid) yang kini
 disimpan tiap BakeFile. Di portfolio, `hero-turn.json` cukup dimuat di Tavern.
 
 ![16 arah, ditampilkan 8](docs/media/turn.png)
@@ -146,7 +146,7 @@ Perbaikan karakter (PR #5):
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
 | `hero.json` | 2,9 MB mentah / **280 KB gzip** (badan 45 KB; outfit 14–24 KB per bagian; helm 2–4 KB; senjata 5–17 KB) |
-| `hero-turn.json` | 9 arah × 22 layer × 1 frame = **107 KB gzip** |
+| `hero-turn.json` | 9 arah × 22 layer × 4 frame = **270 KB gzip** (pose diam 1 frame: 107 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan

@@ -82,8 +82,11 @@ export interface BakeParams {
    * ke origin model. Arah sebaliknya dibuat player dengan mirror, jadi cukup 0..-180.
    */
   views?: number[];
-  /** true = hanya frame 0 tiap clip (pose diam, untuk putar karakter). */
-  still?: boolean;
+  /**
+   * Jumlah frame tetap per clip, diambil merata sepanjang clip (mis. 4 = napas idle untuk putar karakter).
+   * Tanpa ini: clip di-bake penuh di `fps`. fps output file = stillFrames / durasi clip pertama.
+   */
+  stillFrames?: number;
   /** arah hadap model di hasil bake (tergantung orientasi model + yaw). */
   facing: 'left' | 'right';
   /** derajat, kamera sedikit dari atas. */
@@ -486,8 +489,11 @@ function poseAt(ctx: BakeContext, clipName: string, t: number) {
 }
 
 function frameCount(clip: THREE.AnimationClip, p: BakeParams) {
-  return p.still ? 1 : Math.max(1, Math.round(clip.duration * p.fps));
+  return p.stillFrames ?? Math.max(1, Math.round(clip.duration * p.fps));
 }
+
+/** Detik di clip untuk frame ke-i. */
+const frameTime = (clip: THREE.AnimationClip, p: BakeParams, i: number) => (p.stillFrames ? (i * clip.duration) / p.stillFrames : i / p.fps);
 
 const viewDir = (yawDeg: number, pitchDeg: number) => {
   const yaw = THREE.MathUtils.degToRad(yawDeg);
@@ -541,9 +547,10 @@ function measureFraming(ctx: BakeContext, p: BakeParams, visible: Set<string>, y
     cam.updateProjectionMatrix();
     let x0 = M, x1 = -1, y0 = M, y1 = -1, d0 = 255, d1 = 0;
     for (const clipName of Object.values(p.clips)) {
-      const n = frameCount(poseAt(ctx, clipName, 0), p);
+      const clip = poseAt(ctx, clipName, 0);
+      const n = frameCount(clip, p);
       for (let i = 0; i < n; i++) {
-        poseAt(ctx, clipName, i / p.fps);
+        poseAt(ctx, clipName, frameTime(clip, p, i));
         r.setRenderTarget(rt);
         r.clear();
         r.render(ctx.scene, cam);
@@ -831,7 +838,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
       cols: p.cols,
       rows: p.rows,
       cellAspect: p.cellAspect,
-      fps: p.fps,
+      fps: p.stillFrames ? Math.round((p.stillFrames / poseAt(ctx, Object.values(p.clips)[0], 0).duration) * 100) / 100 : p.fps,
       facing: p.facing,
       ramp: glyphs.chars.join(''),
       parts,
@@ -852,7 +859,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
         const n = frameCount(clip, p);
         const frames: FrameData[] = (out.layers[layerKey].clips[clipKey] = []);
         for (let f = 0; f < n; f++) {
-          poseAt(ctx, clipName, f / p.fps);
+          poseAt(ctx, clipName, frameTime(clip, p, f));
           render();
           const cells = sampleCells(p, colBuf, depBuf, idBuf, W, H, levels);
           const shade = new Uint8Array(p.cols * p.rows);

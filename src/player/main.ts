@@ -12,7 +12,7 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as
 const info = $<HTMLElement>('#info');
 $<HTMLElement>('h1').textContent = `┤ ${MODEL.toUpperCase()} ├`;
 
-// `<model>-turn.json` (opsional) = 16 arah pose diam untuk memutar karakter. Di portfolio cukup dimuat di Tavern.
+// `<model>-turn.json` (opsional) = 16 arah idle napas (4 frame) untuk memutar karakter. Di portfolio cukup dimuat di Tavern.
 const [text, turnText] = await Promise.all([
   fetch(URL_JSON).then((r) => r.text()),
   fetch(URL_JSON.replace(/\.json$/, '-turn.json')).then((r) => (r.ok ? r.text() : null)),
@@ -142,7 +142,7 @@ addEventListener('keyup', (e) => {
 });
 
 // Putar: drag di canvas atau tombol ⟲ ⟳, per 22,5°. Animasi hanya di arah samping (hero.json);
-// arah lain = pose diam dari hero-turn.json.
+// arah lain = idle napas 4 frame dari hero-turn.json.
 const norm = (y: number) => ((((y + 180) % 360) + 360) % 360) - 180;
 const isSide = () => Math.abs(state.yaw) === 90;
 const yawEl = $<HTMLElement>('#yaw');
@@ -189,8 +189,8 @@ function compose() {
   const [ox, oy] = f.origin ?? [f.cols / 2, f.rows];
   const dx = Math.round(cols / 2 - (mirror ? f.cols - ox : ox));
   const dy = Math.round((file.origin?.[1] ?? file.rows) - oy);
-  // View pose diam hanya punya frame 0 clip idle.
-  const [clip, frame] = src === sprite ? [state.clip, state.frame] : ['idle', 0];
+  // View putar: beberapa frame idle (napas) dengan fps sendiri; waktu diturunkan dari frame hero.
+  const [clip, frame] = src === sprite ? [state.clip, state.frame] : ['idle', Math.floor((state.frame * f.fps) / file.fps)];
   composeFrame(src, grid, clip, frame, activeLayers(f, state.equip), mirror, dx, dy);
   for (const slot of Object.keys(state.auras)) {
     const layer = state.equip[slot];

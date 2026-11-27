@@ -33,11 +33,11 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   bias compose armor), tuning warna, hero.json 170 KB gzip (dari 250 KB).
 - PR #6 equipment: varian per slot (3 helm, 4 senjata termasuk Gada, armor bisa dilepas), tiap varian = layer bake
   dengan `slot`, UI pilih/lepas di player. Forge (material + rune) jalan di semua senjata.
-- Putar karakter (dipilih user 2026-11-26): **16 arah pose diam** (`hero-turn.json`, 64 KB gzip), arah samping tetap
-  beranimasi dari `hero.json`. Untuk Tavern; Home tetap sudut samping.
+- Putar karakter (dipilih user 2026-11-26): 16 arah; 2026-11-27 user minta napas → **4 frame idle per arah**
+  (`hero-turn.json` 270 KB gzip), arah samping tetap beranimasi penuh dari `hero.json`. Untuk Tavern; Home tetap sudut samping.
 - Wardrobe (2026-11-27, user minta): outfit dipecah ke slot baju/celana/sepatu/bahu (Ranger + Peasant + ShoulderPads),
   helm 5 (termasuk 2 mahkota), senjata 8 (tambah kapak, tombak, palu, sabit dari Modular Weapons Pack CC0), aura per
-  slot (partikel di tepi silhouette, runtime). hero.json 280 KB gzip, hero-turn.json 107 KB gzip. Robe/plate armor
+  slot (partikel di tepi silhouette, runtime). hero.json 280 KB gzip. Robe/plate armor
   butuh pack Quaternius berbayar (diunduh user dari laptop). Tombak/kapak dua tangan belum punya pose sendiri.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
