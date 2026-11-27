@@ -1,7 +1,8 @@
-// Rune = emitter partikel glyph yang menempel ke socket blade. Tanpa Three.js.
+// Rune / aura = emitter partikel glyph. Rune menempel ke socket blade, aura ke tepi silhouette satu layer.
+// Tanpa Three.js.
 // Partikel hidup di koordinat grid (unit sel) dan digambar di-snap ke sel supaya tetap terasa ASCII.
 import type { BladeSocket } from './format';
-import type { Grid } from './compose';
+import { edgeCells, type Grid } from './compose';
 
 export interface RuneDef {
   label: string;
@@ -35,6 +36,74 @@ export const RUNES = {
 
 export type RuneKey = keyof typeof RUNES;
 
+/** Aura per item: partikel lahir di tepi silhouette layer, lebih jarang dan lambat dari rune. */
+export const AURAS = {
+  ember: { ...RUNES.fire, label: 'Bara', rate: 45, vel: [0, -5], jitter: 2 },
+  holy: {
+    label: 'Suci',
+    rate: 40,
+    life: [0.6, 1.4],
+    vel: [0, -3],
+    jitter: 1.5,
+    glyphs: "+*'.",
+    colors: ['#fff6d0', '#f6dc8c', '#d4a64a', '#5a3e10'],
+    glow: '#f6dc8c',
+  },
+  frost: {
+    label: 'Es',
+    rate: 40,
+    life: [0.6, 1.4],
+    vel: [0, 2],
+    jitter: 2,
+    glyphs: '*+:.',
+    colors: ['#f0fbff', '#a8d8f0', '#5a90b8', '#1e3448'],
+    glow: '#a8d8f0',
+  },
+  shadow: {
+    label: 'Bayangan',
+    rate: 50,
+    life: [0.7, 1.6],
+    vel: [0, -4],
+    jitter: 3,
+    glyphs: '%~:.',
+    colors: ['#d8b0f0', '#8a5ab0', '#4a2a68', '#1a0e24'],
+    glow: '#8a5ab0',
+  },
+  venom: {
+    label: 'Racun',
+    rate: 40,
+    life: [0.5, 1.2],
+    vel: [0, 4],
+    jitter: 1,
+    glyphs: '§o:.',
+    colors: ['#e0f8b0', '#8fae6a', '#4a6a2a', '#1a2a10'],
+    glow: '#8fae6a',
+  },
+} satisfies Record<string, RuneDef>;
+
+export type AuraKey = keyof typeof AURAS;
+
+/** Titik spawn partikel di koordinat grid (unit sel), atau null = berhenti spawn. */
+export type Spawn = (() => [number, number]) | null;
+
+/** Spawn acak di sepanjang socket blade. */
+export const alongBlade = (blade: BladeSocket | null): Spawn =>
+  blade &&
+  (() => {
+    const t = Math.random();
+    return [blade.base[0] + (blade.tip[0] - blade.base[0]) * t, blade.base[1] + (blade.tip[1] - blade.base[1]) * t];
+  });
+
+/** Spawn acak di sel tepi silhouette satu layer. Dihitung ulang saat frame berganti. */
+export function alongEdge(grid: Grid, layer: string): Spawn {
+  const edge = edgeCells(grid, layer);
+  if (!edge.length) return null;
+  return () => {
+    const i = edge[Math.floor(Math.random() * edge.length)];
+    return [(i % grid.cols) + Math.random(), Math.floor(i / grid.cols) + Math.random()];
+  };
+}
+
 interface Particle {
   x: number;
   y: number;
@@ -63,8 +132,8 @@ export class RuneEmitter {
     });
   }
 
-  /** dt dalam detik. Tanpa socket (senjata disembunyikan) = berhenti spawn, partikel lama tetap habis. */
-  update(dt: number, blade: BladeSocket | null) {
+  /** dt dalam detik. Tanpa spawn (item dilepas) = berhenti spawn, partikel lama tetap habis. */
+  update(dt: number, spawn: Spawn) {
     const r = this.rune;
     for (const p of this.ps) {
       p.age += dt;
@@ -72,16 +141,14 @@ export class RuneEmitter {
       p.y += p.vy * dt;
     }
     this.ps = this.ps.filter((p) => p.age < p.life);
-    if (!blade) return;
+    if (!spawn) return;
     this.carry += r.rate * dt;
-    const [bx, by] = blade.base;
-    const [tx, ty] = blade.tip;
     while (this.carry >= 1 && this.ps.length < MAX_PARTICLES) {
       this.carry--;
-      const t = Math.random();
+      const [x, y] = spawn();
       this.ps.push({
-        x: bx + (tx - bx) * t,
-        y: by + (ty - by) * t,
+        x,
+        y,
         vx: r.vel[0] + (Math.random() * 2 - 1) * r.jitter,
         vy: r.vel[1] + (Math.random() * 2 - 1) * r.jitter,
         age: 0,

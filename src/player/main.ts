@@ -2,7 +2,7 @@
 import type { BakeFile, TurnFile } from '../shared/format';
 import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment, type Sprite } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
-import { RUNES, RuneEmitter, type RuneKey } from '../shared/runes';
+import { AURAS, RUNES, RuneEmitter, alongBlade, alongEdge, type AuraKey, type RuneKey, type Spawn } from '../shared/runes';
 import { BLADE_MATERIALS, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
 
 const MODEL = new URLSearchParams(location.search).get('model') ?? 'hero';
@@ -42,12 +42,17 @@ const state = {
   equip: defaultEquipment(file),
   playing: !reducedMotion,
   rune: null as RuneEmitter | null,
+  /** aura per slot; partikel lahir di tepi silhouette item yang dipasang di slot itu. */
+  auras: {} as Record<string, RuneEmitter>,
   frame: 0,
 };
+// Titik spawn aura per slot, dihitung ulang tiap compose (frame/equipment/arah berganti).
+const auraSpawn: Record<string, Spawn> = {};
 
 // Equipment per slot: pilih satu varian atau kosongkan. Tiap varian = satu layer bake,
 // jadi ganti equipment = ganti daftar layer yang di-compose, tanpa decode ulang.
-const SLOT_LABEL: Record<string, string> = { helmet: 'Helm', armor: 'Armor', weapon: 'Senjata' };
+const SLOT_LABEL: Record<string, string> = { helmet: 'Helm', shoulder: 'Bahu', torso: 'Baju', legs: 'Celana', feet: 'Sepatu', weapon: 'Senjata', armor: 'Armor' };
+const auraOptions = ['<option value="">Aura: tanpa</option>', ...Object.entries(AURAS).map(([k, a]) => `<option value="${k}">Aura: ${a.label}</option>`)].join('');
 const equipEl = $<HTMLElement>('#equip');
 for (const slot of Object.keys(state.equip)) {
   const variants = Object.entries(file.layers).filter(([, l]) => l.slot === slot);
@@ -55,8 +60,17 @@ for (const slot of Object.keys(state.equip)) {
     .map(([k, label]) => `<button data-slot="${slot}" data-layer="${k}" aria-pressed="${state.equip[slot] === k}">${label}</button>`)
     .join('');
   const name = SLOT_LABEL[slot] ?? slot;
-  equipEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${name}</span><div class="row" role="group" aria-label="${name}">${buttons}</div>`);
+  const aura = reducedMotion ? '' : `<select data-aura="${slot}" aria-label="Aura ${name}">${auraOptions}</select>`;
+  equipEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${name} ${aura}</span><div class="row" role="group" aria-label="${name}">${buttons}</div>`);
 }
+equipEl.addEventListener('change', (e) => {
+  const sel = (e.target as HTMLElement).closest<HTMLSelectElement>('select[data-aura]');
+  if (!sel) return;
+  const slot = sel.dataset.aura!;
+  if (sel.value) state.auras[slot] = new RuneEmitter(AURAS[sel.value as AuraKey]);
+  else delete state.auras[slot];
+  draw();
+});
 equipEl.addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-slot]');
   if (!b) return;
@@ -165,6 +179,7 @@ if (!turn) $<HTMLElement>('#turn').hidden = true;
 
 function paint() {
   view.draw(grid, state.mode, state.sockets);
+  for (const a of Object.values(state.auras)) a.draw(view.ctx, grid, view.cellW, view.cellH, view.background);
   state.rune?.draw(view.ctx, grid, view.cellW, view.cellH, view.background);
 }
 function compose() {
@@ -177,6 +192,10 @@ function compose() {
   // View pose diam hanya punya frame 0 clip idle.
   const [clip, frame] = src === sprite ? [state.clip, state.frame] : ['idle', 0];
   composeFrame(src, grid, clip, frame, activeLayers(f, state.equip), mirror, dx, dy);
+  for (const slot of Object.keys(state.auras)) {
+    const layer = state.equip[slot];
+    auraSpawn[slot] = layer ? alongEdge(grid, layer) : null;
+  }
 }
 function draw() {
   compose();
@@ -200,9 +219,10 @@ function tick(now: number) {
       compose();
       changed = true;
     }
-    // Sprite berganti di fps bake; partikel rune diupdate tiap rAF supaya halus.
-    if (state.rune) state.rune.update(dt, grid.blade);
-    if (changed || state.rune) paint();
+    // Sprite berganti di fps bake; partikel rune/aura diupdate tiap rAF supaya halus.
+    state.rune?.update(dt, alongBlade(grid.blade));
+    for (const [slot, a] of Object.entries(state.auras)) a.update(dt, auraSpawn[slot] ?? null);
+    if (changed || state.rune || Object.keys(state.auras).length) paint();
   }
   requestAnimationFrame(tick);
 }

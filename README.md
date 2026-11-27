@@ -15,7 +15,7 @@ npm run dev
 
 - `http://localhost:5173/bake.html` → **bake tool** (dev only, pakai Three.js). Atur parameter, klik **Bake**, lalu
   **Simpan ke public/baked/hero.json** (endpoint dev di `vite.config.ts`) atau **Download JSON**.
-- `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), equipment per slot,
+- `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), equipment per slot, aura per slot, putar 16 arah,
   material blade (Iron/Steel/Gold/Bloodiron), rune api, mode warna Material/Part/Depth, penanda socket blade.
   Tahan ← / → untuk berjalan.
 - `npm run build` hanya mem-build player. Hasil saat ini: JS 11,5 KB (5,3 KB gzip), Three.js tidak ikut.
@@ -47,8 +47,8 @@ Format lengkap: `src/shared/format.ts` (BakeFile v2). File v1 (char final) tidak
 
 ## Equipment (varian per slot)
 
-Tiap varian equipment = **satu layer bake** dengan field `slot` (`armor`, `helmet`, `weapon`). Ukuran file = jumlah
-layer, bukan kombinasi: 3 helm + 3 senjata = 6 layer kecil, bukan 9 kombinasi badan penuh. Semua varian di-bake
+Tiap varian equipment = **satu layer bake** dengan field `slot` (`torso`, `legs`, `feet`, `shoulder`, `helmet`,
+`weapon`). Ukuran file = jumlah layer, bukan kombinasi: 21 varian = 21 layer, bukan ribuan kombinasi. Semua varian di-bake
 dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
 
 - Player memasang maksimal satu layer per slot (`activeLayers` / `defaultEquipment` di `compose.ts`), atau slot
@@ -60,18 +60,33 @@ dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
 
 | Slot | Varian | Part |
 |---|---|---|
-| Armor | Rompi Ranger | cloth, leather, armor |
-| Helm | Helm Besi (`Helmet1`), Helm Ksatria (`Helmet2`), Helm Bangsawan (`Helmet3`) | helmet, trim (hiasan emas) |
-| Senjata | Pedang (`Sword`), Pedang Pendek (`ShortSword`), Katana, Gada (`Club`) | blade, hilt, wood |
+| Baju | Rompi Ranger, Tunik Petani | cloth, leather, linen |
+| Celana | Celana Ranger, Celana Petani | cloth, wool |
+| Sepatu | Sepatu Ranger, Sepatu Petani | leather, wool |
+| Bahu | Pauldron Ranger, Bahu Ksatria (`ShoulderPads`) | armor |
+| Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`) | helmet, trim, gem |
+| Senjata | Pedang, Pedang Pendek, Katana, Gada (Knight Pack); Kapak, Tombak, Palu Perang, Sabit Maut (Modular Weapons Pack) | blade, hilt, wood |
 
-![varian equipment](docs/media/equipment.png)
+Outfit Ranger dan Peasant memang terdiri dari mesh terpisah per bagian, jadi bisa dipecah ke slot dan di-mix tanpa aset
+baru. Semua layer outfit memakai `bias` 4 cm (badan Superhero lebih besar dari tubuh outfit).
 
-Kiri ke kanan: Helm Besi + Pedang (Iron), Helm Ksatria + Pedang Pendek (Steel), Helm Bangsawan + Katana (Gold),
-Helm Besi + Gada (Bloodiron), tanpa helm dan senjata. Di 90 baris, beda helm terutama terbaca dari silhouette.
+![wardrobe](docs/media/wardrobe.png)
 
-Forge berlaku di semua senjata. Gada tidak punya bilah: kepala kayu tetap material kayu, **paku + cincin di kepala**
-jadi part `blade` (ikut material forge dan sumber socket rune), lilitan gagang = `hilt`. `ShoulderPads` belum dipakai
-(Ranger sudah punya pauldron).
+Kiri ke kanan: set Ranger + Helm Bangsawan + Pedang (aura Suci di helm); set Petani + Mahkota Rubi + Sabit (Bloodiron,
+aura Bayangan di senjata); campuran + Bahu Ksatria + Kapak (aura Es di baju); Mahkota + Tombak (Gold, aura Bara);
+Helm Ksatria + Palu Perang (aura Racun di bahu).
+
+Forge berlaku di semua senjata. Senjata tanpa bilah memakai aturan: **bagian logam = part `blade`** (ikut material
+forge + sumber socket rune), kayu tetap `wood`. Gada: paku + cincin kepala; Palu: kepala palu (cincin gagang = hilt);
+Kapak/Tombak/Sabit: mata senjata. Tombak dipegang tegak supaya grid tidak melebar 2 m ke depan; Kapak dan Sabit
+diputar (`spin`) supaya sisi lebar mata senjata menghadap kamera. Pose genggam tetap satu tangan (pose `Sword_Idle`).
+
+## Aura
+
+Aura = partikel glyph seperti rune, tapi lahir di **tepi silhouette item** (sel milik layer itu yang bertetangga dengan
+sel kosong atau layer lain), bukan di socket blade. Compose kini mencatat layer pemilik tiap sel (`Grid.owner`), dan
+`edgeCells()` mengambil tepinya tiap frame. Tanpa bake ulang dan tanpa menambah ukuran file. Per slot bisa dipilih
+satu aura: Bara, Suci, Es, Bayangan, Racun (`AURAS` di `runes.ts`). Mati total saat `prefers-reduced-motion`.
 
 ## Memutar karakter (16 arah, pose diam)
 
@@ -105,8 +120,9 @@ Satu karakter proporsi realistis (bukan chibi), tinggi 90 baris. Semua aset **CC
 |---|---|---|
 | Badan | Universal Base Characters, `Superhero_Male` | `assets/models/quaternius-ubc/` |
 | Animasi | Universal Animation Library, `Idle_Loop` + `Walk_Loop` + `Sword_Idle` (dipangkas, 540 KB) | `assets/models/quaternius-ubc/` |
-| Armor | Modular Character Outfits – Fantasy, outfit `Male_Ranger` (tanpa lengan dan hood) | `assets/models/quaternius-outfits/` |
-| Helm, pedang | Animated Knight Pack (`Helmet1`, `Sword`; ada juga Helmet2/3, ShortSword, Katana, Club) | `assets/models/quaternius/` |
+| Baju, celana, sepatu, bahu | Modular Character Outfits – Fantasy, outfit `Male_Ranger` + `Male_Peasant` | `assets/models/quaternius-outfits/` |
+| Helm, pedang, bahu | Animated Knight Pack (`Helmet1–3`, `Sword`, `ShortSword`, `Katana`, `Club`, `ShoulderPads`) | `assets/models/quaternius/` |
+| Kapak, tombak, palu, sabit, mahkota | Modular Weapons Pack + Ultimate RPG Pack | `assets/models/quaternius-weapons/` |
 
 Sumber unduhan dan catatan lisensi ada di `SOURCE.md` tiap folder (diambil dari mirror GitHub karena situs Quaternius
 tidak bisa diakses dari cloud). Versi gratis Modular Outfits hanya berisi Ranger dan Peasant; outfit armor penuh ada di
@@ -124,16 +140,19 @@ Perbaikan karakter (PR #5):
 
 ![sebelum dan sesudah](docs/media/hero-before-after.png)
 
-## Hasil saat ini (hero, 10 layer × 2 clip @12fps)
+## Hasil saat ini (hero, 22 layer × 2 clip @12fps)
 
 | | |
 |---|---|
-| Grid | 100 × 90 (`hero-turn`: 128 × 90, simetris di origin) |
-| `hero.json` | 1,70 MB mentah / **170 KB gzip** (10 layer; tiap varian helm/senjata ±3–6 KB gzip) |
-| `hero-turn.json` | 9 arah × 10 layer × 1 frame = **64 KB gzip** |
-| Player JS | 11,5 KB (5,3 KB gzip), tanpa Three.js |
+| Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
+| `hero.json` | 2,9 MB mentah / **280 KB gzip** (badan 45 KB; outfit 14–24 KB per bagian; helm 2–4 KB; senjata 5–17 KB) |
+| `hero-turn.json` | 9 arah × 22 layer × 1 frame = **107 KB gzip** |
+| Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
-Ruang optimasi yang belum dikerjakan: format biner tanpa base64 (uji: ±130 KB gzip), delta antar frame, fps 8–10.
+Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan
+`hero-turn.json` hanya di Tavern. Kalau masih terasa berat: file per layer yang dimuat saat dipilih.
+
+Ruang optimasi lain yang belum dikerjakan: format biner tanpa base64 (uji: ±130 KB gzip), delta antar frame, fps 8–10.
 
 ## Struktur
 
