@@ -25,11 +25,16 @@ def cross(a, b):
     return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 
 
-def feather(root, tip, width, out, ragged=False, seg=8):
-    """Helai bulu dari root ke tip. out = arah ke luar permukaan (menjauhi badan). Return (verts, norms, idx)."""
+def feather(root, tip, width, out, ragged=False, seg=12):
+    """Helai bulu dari root ke tip. out = arah ke luar permukaan (menjauhi badan).
+    Return (verts, norms, idx, material, colors). Warna vertex = gradasi terang-gelap (bukan warna akhir: warna
+    dari pewarna part `feather` di runtime, gradasi ini masuk ke shade level lewat `albedo` bake):
+    pangkal gelap, tengah terang, ujung meredup, tulang bulu lebih terang, belang serat tipis, tiap helai beda nada.
+    Tepi helai melengkung ke arah badan (cekung) supaya cahaya jatuh berbeda di kiri-kanan tulang bulu."""
     d = [tip[k] - root[k] for k in range(3)]
     side = norm(cross(d, out))
-    verts, idx = [], []
+    tone = random.uniform(0.6, 1.05)
+    verts, cols, idx = [], [], []
     for i in range(seg + 1):
         t = i / seg
         c = lerp3(root, tip, t)
@@ -37,9 +42,14 @@ def feather(root, tip, width, out, ragged=False, seg=8):
         if ragged and 0.55 < t < 0.95 and i % 2:
             w *= 0.45  # gerigi: bulu robek
         lift = 0.006 * (1 - t)
+        along = 0.2 + 0.8 * math.sin(math.pi * min(1.0, t / 0.7) / 2) - 0.45 * max(0.0, t - 0.7) / 0.3
+        stripe = 0.12 if i % 2 else -0.1
         for s in (-1, 0, 1):
-            p = [c[k] + side[k] * w * s + out[k] * (lift if s == 0 else 0) for k in range(3)]
+            cup = -0.012 * (w / width) if s else lift
+            p = [c[k] + side[k] * w * s + out[k] * cup for k in range(3)]
             verts.append(p)
+            v = max(0.08, min(1.0, tone * (along + stripe) * (1.2 if s == 0 else 0.75)))
+            cols.append([v, v, v, 1.0])
     for i in range(seg):
         a = i * 3
         for j in range(2):
@@ -52,7 +62,7 @@ def feather(root, tip, width, out, ragged=False, seg=8):
         for k in range(3):
             for j in range(3):
                 norms[idx[i + k]][j] += n[j]
-    return verts, [norm(n) for n in norms], idx
+    return verts, [norm(n) for n in norms], idx, 'Feather', cols
 
 
 def bone(a, b, r):
@@ -89,7 +99,7 @@ def wing(s):
         r[2] += 0.003 * i
         length = random.uniform(1.1, 1.22) - 0.15 * t
         tip = [r[0] + s * (-0.02 + 0.04 * t), r[1] - length, r[2] - 0.03 + 0.02 * t]
-        parts.append((*feather(r, tip, 0.06, out, ragged=random.random() < 0.4), 'Feather'))
+        parts.append(feather(r, tip, 0.06, out, ragged=random.random() < 0.4))
     # Sekunder: dari lengan bawah (E→W), lebih pendek, menutupi pangkal primer.
     for i in range(14):
         t = i / 13
@@ -97,7 +107,7 @@ def wing(s):
         r[2] -= 0.02
         length = random.uniform(0.62, 0.75) * (0.8 + 0.35 * t)
         tip = [r[0] - s * 0.05 * (1 - t), r[1] - length, r[2] - 0.03]
-        parts.append((*feather(r, tip, 0.065, out, ragged=random.random() < 0.35), 'Feather'))
+        parts.append(feather(r, tip, 0.065, out, ragged=random.random() < 0.35))
     # Bulu penutup: dua baris pendek di atas, paling luar.
     for row, (ln, dz) in enumerate(((0.26, -0.04), (0.15, -0.055))):
         for i in range(11):
@@ -105,13 +115,13 @@ def wing(s):
             r = lerp3(S, W, t) if row else lerp3(E, W, t)
             r = [r[0], r[1] + 0.02, r[2] + dz]
             tip = [r[0], r[1] - ln * random.uniform(0.85, 1.1), r[2] - 0.015]
-            parts.append((*feather(r, tip, 0.05, out), 'Feather'))
+            parts.append(feather(r, tip, 0.05, out))
     # Bulu bahu (skapular) dari S ke E.
     for i in range(6):
         r = lerp3(S, E, i / 5)
         r[2] -= 0.03
         tip = [r[0], r[1] - 0.32, r[2] - 0.02]
-        parts.append((*feather(r, tip, 0.05, out), 'Feather'))
+        parts.append(feather(r, tip, 0.05, out))
     return parts
 
 
@@ -120,16 +130,17 @@ def write_glb(path, parts, colors):
     bin_ = bytearray()
     accessors, views, prims = [], [], []
     for mi, mat in enumerate(mats):
-        V, N, I = [], [], []
-        for v, n, idx, m in parts:
+        V, N, I, C = [], [], [], []
+        for v, n, idx, m, *col in parts:
             if m != mat:
                 continue
             off = len(V)
             V += v
             N += n
+            C += col[0] if col else [[1.0, 1.0, 1.0, 1.0]] * len(v)
             I += [off + x for x in idx]
-        for data, fmt, target, comp, typ in ((V, 'f', 34962, 5126, 'VEC3'), (N, 'f', 34962, 5126, 'VEC3'), (I, 'I', 34963, 5125, 'SCALAR')):
-            flat = [x for row in data for x in row] if typ == 'VEC3' else data
+        for data, fmt, target, comp, typ in ((V, 'f', 34962, 5126, 'VEC3'), (N, 'f', 34962, 5126, 'VEC3'), (C, 'f', 34962, 5126, 'VEC4'), (I, 'I', 34963, 5125, 'SCALAR')):
+            flat = [x for row in data for x in row] if typ != 'SCALAR' else data
             start = len(bin_)
             bin_ += struct.pack(f'<{len(flat)}{fmt}', *flat)
             while len(bin_) % 4:
@@ -140,8 +151,8 @@ def write_glb(path, parts, colors):
                 acc['min'] = [min(p[k] for p in V) for k in range(3)]
                 acc['max'] = [max(p[k] for p in V) for k in range(3)]
             accessors.append(acc)
-        a0 = len(accessors) - 3
-        prims.append({'attributes': {'POSITION': a0, 'NORMAL': a0 + 1}, 'indices': a0 + 2, 'material': mi})
+        a0 = len(accessors) - 4
+        prims.append({'attributes': {'POSITION': a0, 'NORMAL': a0 + 1, 'COLOR_0': a0 + 2}, 'indices': a0 + 3, 'material': mi})
     gltf = {
         'asset': {'version': '2.0', 'generator': 'make_wings.py'},
         'scene': 0,
