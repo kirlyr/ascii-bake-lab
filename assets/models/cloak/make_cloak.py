@@ -1,40 +1,47 @@
 """Jubah prosedural (aset buatan sendiri, CC0) untuk slot back.
 
 Jalankan: python3 make_cloak.py  →  Cloak.glb (di folder ini).
-Koordinat glTF: Y atas, +Z depan karakter, satuan meter. Origin = punggung atas (ditempel ke spine_03).
-Jubah = lembar melengkung dari bahu sampai betis, melebar dan menjauh ke belakang di bawah, dengan lipatan
-kain (gelombang sinus) dan kerah yang membungkus bahu. Material dua sisi.
+Koordinat = ruang model saat rest pose (Y atas, +Z depan, meter); attachment memakai `rest: true`.
+Ini hanya bentuk awal: saat bake, `src/bake/cloth.ts` mensimulasikannya sebagai kain (2 baris atas dipaku di
+garis bahu). Bagian bawah sengaja jauh lebih lebar dari kerah, supaya kelebihan kain jatuh menjadi lipatan.
+Grid baris-mayor (baris 0 = kerah), (ROWS+1)×(COLS+1) vertex; `cols` di spec cloth = COLS+1.
 """
 import json, math, struct, sys
 from pathlib import Path
 
-ROWS, COLS = 18, 24
-TOP_Y, BOTTOM_Y = 0.22, -1.0
-FOLDS = 5
+ROWS, COLS = 40, 32
+TOP_Y, BOTTOM_Y = 1.47, 0.3  # garis bahu → betis
+FOLDS = 7
+
+
+def lerp(a, b, t):
+    return a + (b - a) * t
 
 
 def cloak():
     verts, idx = [], []
     for r in range(ROWS + 1):
         t = r / ROWS  # 0 = kerah, 1 = ujung bawah
-        y = TOP_Y + (BOTTOM_Y - TOP_Y) * t
-        half_w = 0.27 + 0.2 * t  # melebar ke bawah
-        back = 0.2 + 0.18 * t ** 1.4  # menjauh dari badan (jatuh di belakang kaki saat berjalan)
-        wrap = math.radians(150 - 45 * t)  # kerah membungkus bahu, bawah lebih terbuka
+        y = lerp(TOP_Y, BOTTOM_Y, t)
+        # Elips di sekeliling badan: kerah membungkus leher dan bahu, bawah lebar dan sedikit menjauh.
+        k = min(1.0, t / 0.12)  # kerah → badan dalam 12% teratas
+        rx = lerp(0.17, 0.21, k) + 0.16 * t
+        rz = lerp(0.12, 0.17, k) + 0.12 * t
+        cz = lerp(-0.03, -0.02, t)
+        wrap = math.radians(lerp(230, 170, k))  # kerah hampir melingkar, badan menutup punggung + sisi
         for c in range(COLS + 1):
-            u = c / COLS * 2 - 1  # -1..1 kiri ke kanan
+            u = c / COLS * 2 - 1  # -1..1 kanan ke kiri karakter
             a = u * wrap / 2
-            x = math.sin(a) * half_w
-            z = -math.cos(a) * back
-            fold = math.sin(u * math.pi * FOLDS) * 0.025 * t  # lipatan makin dalam ke bawah
-            z -= fold
+            fold = math.sin(u * math.pi * FOLDS) * 0.035 * t ** 1.5  # lipatan awal, dalam di bawah
+            x = math.sin(a) * (rx + fold)
+            z = cz - math.cos(a) * (rz + fold)
             verts.append([x, y, z])
     for r in range(ROWS):
         for c in range(COLS):
             a = r * (COLS + 1) + c
             b, d = a + 1, a + COLS + 1
             idx += [a, d, b, b, d, d + 1]
-    # normal per vertex dari rata-rata normal segitiga
+    # normal per vertex dari rata-rata normal segitiga (runtime bake menghitung ulang setelah simulasi)
     norms = [[0.0, 0.0, 0.0] for _ in verts]
     for i in range(0, len(idx), 3):
         p0, p1, p2 = (verts[idx[i + k]] for k in range(3))

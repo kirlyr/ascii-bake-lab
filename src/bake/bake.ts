@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { b64encode, EMPTY_DEPTH, MAX_PARTS, MAX_SHADES, packCell, type BakeFile, type BladeSocket, type FrameData, type SocketPoint } from '../shared/format';
 import { buildGlyphSet, makeMatcher, DIMS, REG_X, REG_Y } from './glyphs';
+import { Cloth, type ClothSpec } from './cloth';
 
 export interface LayerDef {
   label: string;
@@ -51,6 +52,8 @@ export interface Attachment {
   scale: number | [number, number, number];
   /** derajat. Putar aksesori di sumbu panjangnya (Y setelah node -90° X) sebelum `rotation`. */
   spin?: number;
+  /** true = mesh dibuat di ruang model saat rest pose (bukan ruang tulang); position/rotation/scale diabaikan. */
+  rest?: boolean;
 }
 
 export interface PoseOverlay {
@@ -102,6 +105,8 @@ export interface BakeParams {
    */
   overlays?: Record<string, PoseOverlay>;
   attachments?: Attachment[];
+  /** mesh kain yang disimulasikan saat bake (lihat cloth.ts). */
+  cloth?: ClothSpec[];
   /**
    * Outfit skinned dengan rig yang sama (mis. Quaternius Modular Outfits di atas Universal Base Characters).
    * Mesh-nya di-bind ulang ke skeleton model utama, jadi ikut animasi yang sama.
@@ -173,6 +178,32 @@ export const DEFAULT_PARAMS: BakeParams = {
   // (kepalan), jadi pedang tetap di tangan dan tidak terayun ke belakang saat walk.
   overlays: { idle: SWORD_ARM, walk: SWORD_ARM },
   clips: { idle: 'idle', walk: 'walk' },
+  // Jubah disimulasikan sebagai kain wol berat: 2 baris atas dipaku di garis bahu, sisanya bebas (tarikan bentuk
+  // sangat kecil). Walk in-place → angin semu 1,3 m/s. Kapsul = badan, lengan, kaki (kaki menendang ujung jubah).
+  cloth: [
+    {
+      mesh: 'cloak:Cloth',
+      cols: 33,
+      pinRows: 2,
+      shape: 0.04,
+      drag: 1.1,
+      wind: { walk: 1.3 },
+      colliders: [
+        { from: 'pelvis', to: 'spine_01', radius: 0.155 },
+        { from: 'spine_01', to: 'spine_03', radius: 0.165 },
+        { from: 'spine_03', to: 'neck_01', radius: 0.14 },
+        // Palang bahu: jubah menyelimuti pundak, tidak jatuh dari leher saja.
+        { from: 'upperarm_l', to: 'upperarm_r', radius: 0.075 },
+        ...(['l', 'r'] as const).flatMap((s) => [
+          { from: `upperarm_${s}`, to: `lowerarm_${s}`, radius: 0.065 },
+          { from: `lowerarm_${s}`, to: `hand_${s}`, radius: 0.055 },
+          { from: `thigh_${s}`, to: `calf_${s}`, radius: 0.125 },
+          { from: `calf_${s}`, to: `foot_${s}`, radius: 0.095 },
+        ]),
+      ],
+    },
+  ],
+
   outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`],
   outfitInflate: 0.02,
   attachments: [
@@ -189,10 +220,22 @@ export const DEFAULT_PARAMS: BakeParams = {
     { ...weapon('spear', `${W}/Spear.glb`), rotation: [0, 0, 180], scale: 0.18 },
     { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
     { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
-    // Jubah buatan sendiri (assets/models/cloak/make_cloak.py), sudah Y-atas dalam meter. Kaku, ikut dada.
-    { name: 'cloak', url: '/assets/models/cloak/Cloak.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
+    // Jubah buatan sendiri (assets/models/cloak/make_cloak.py), ruang model rest pose; disimulasikan (lihat `cloth`).
+    { name: 'cloak', url: '/assets/models/cloak/Cloak.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
     // Sayap bulu buatan sendiri (assets/models/wings/make_wings.py), sudah Y-atas dalam meter. Satu slot dengan jubah.
     { name: 'wings', url: '/assets/models/wings/Wings.glb', bone: 'spine_03', position: [0, 0.02, 0], rotation: [0, 0, 0], scale: 1 },
+    // Pelat kaki + sepatu besi buatan sendiri (assets/models/greaves/make_greaves.py), dibuat di ruang model rest pose.
+    ...(['l', 'r'] as const).flatMap((s): Attachment[] =>
+      ([['thigh', 'Thigh'], ['calf', 'Greave'], ['foot', 'Sabaton']] as const).map(([bone, file]) => ({
+        name: `${file.toLowerCase()}_${s}`,
+        url: `/assets/models/greaves/${file}_${s.toUpperCase()}.glb`,
+        bone: `${bone}_${s}`,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: 1,
+        rest: true,
+      })),
+    ),
     // Bantalan bahu Knight Pack: satu mesh melintang kedua bahu, ditempel ke tulang dada atas, miring 45°.
     // Zirah dada Ultimate RPG Pack (item statis, tidak di-rig): ditempel ke tulang dada atas.
     ...['Black', 'Golden', 'Leather', 'Metal', 'Metal2'].map((m): Attachment => ({
@@ -225,6 +268,9 @@ export const DEFAULT_PARAMS: BakeParams = {
     peasant_legs: { label: 'Celana Petani', slot: 'legs', bias: 0.04, parts: { wool: ['Male_Peasant_Legs'] } },
     ranger_feet: { label: 'Sepatu Ranger', slot: 'feet', bias: 0.04, parts: { leather: ['Male_Ranger_Feet_Boots'] } },
     peasant_feet: { label: 'Sepatu Petani', slot: 'feet', bias: 0.04, parts: { wool: ['Male_Peasant_Feet'] } },
+    // Celana Ranger tetap di bawah pelat supaya celah antar pelat tidak menampakkan kulit.
+    plate_legs: { label: 'Pelat Kaki', slot: 'legs', bias: 0.04, parts: { cloth: ['Male_Ranger_Legs'], armor: ['thigh_l:Plate', 'thigh_r:Plate', 'greave_l:Plate', 'greave_r:Plate'] } },
+    plate_feet: { label: 'Sepatu Besi', slot: 'feet', bias: 0.04, parts: { armor: ['sabaton_l:Plate', 'sabaton_r:Plate'] } },
     ranger_pauldron: { label: 'Pauldron Ranger', slot: 'shoulder', bias: 0.04, parts: { armor: ['Male_Ranger_Acc_Pauldron'] } },
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
     cloak: { label: 'Cloak', slot: 'back', parts: { cloak: ['cloak:Cloth'] } },
@@ -376,6 +422,7 @@ export interface BakeContext {
   mixer: THREE.AnimationMixer;
   animations: THREE.AnimationClip[];
   meshes: Map<string, THREE.Object3D>;
+  cloth: Cloth[];
 }
 
 const loadAny = async (url: string): Promise<{ scene: THREE.Object3D; animations: THREE.AnimationClip[] }> => {
@@ -471,10 +518,17 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     holder.name = a.name;
     holder.add(acc);
     acc.rotation.y = THREE.MathUtils.degToRad(a.spin ?? 0);
-    holder.position.fromArray(a.position);
-    holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
-    if (typeof a.scale === 'number') holder.scale.setScalar(a.scale);
-    else holder.scale.set(...a.scale);
+    if (a.rest) {
+      // Belum ada animasi: matrixWorld tulang = rest pose. holder = ruang model → ruang tulang.
+      root.updateMatrixWorld(true);
+      holder.matrixAutoUpdate = false;
+      holder.matrix.copy(bone.matrixWorld).invert().multiply(root.matrixWorld);
+    } else {
+      holder.position.fromArray(a.position);
+      holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
+      if (typeof a.scale === 'number') holder.scale.setScalar(a.scale);
+      else holder.scale.set(...a.scale);
+    }
     bone.add(holder);
     acc.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -484,7 +538,7 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     });
   }
 
-  return {
+  const ctx: BakeContext = {
     renderer,
     scene,
     camera: new THREE.OrthographicCamera(),
@@ -492,7 +546,11 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     mixer: new THREE.AnimationMixer(root),
     animations,
     meshes,
+    cloth: [],
   };
+  root.updateMatrixWorld(true);
+  ctx.cloth = (p.cloth ?? []).map((c) => new Cloth(ctx, c));
+  return ctx;
 }
 
 function setVisible(ctx: BakeContext, names: Set<string> | null) {
@@ -507,6 +565,7 @@ function poseAt(ctx: BakeContext, clipName: string, t: number) {
   action.reset().play();
   ctx.mixer.setTime(t);
   ctx.root.updateMatrixWorld(true);
+  for (const c of ctx.cloth) c.apply(clipName, t);
   return clip;
 }
 

@@ -30,6 +30,8 @@ export const ITEMS: Record<string, ItemText> = {
   peasant_legs: { name: 'Woolen Breeches', kind: 'legs · wool', desc: 'Spun in the village, dyed in the river. Itchy, but they last.' },
   ranger_feet: { name: 'Ranger Boots', kind: 'feet · leather', desc: 'Soft soles, high cuffs. They have walked every road on the old map.' },
   peasant_feet: { name: 'Wrapped Shoes', kind: 'feet · wool', desc: 'Cloth wraps over thin leather. Good for fields, bad for dragons.' },
+  plate_legs: { name: 'Iron Greaves', kind: 'legs · plate & cloth', desc: 'Cuisses, knee cops and greaves over ranger trousers. You hear them coming a mile off.' },
+  plate_feet: { name: 'Iron Sabatons', kind: 'feet · plate', desc: 'Overlapping lames from heel to toe. Ruinous on stairs, glorious on toes.' },
   ranger_pauldron: { name: 'Ranger Pauldron', kind: 'shoulders · plate', desc: 'A single plate on the bow arm. Turns a stray arrow, not much more.' },
   knight_pads: { name: 'Knight Pauldrons', kind: 'shoulders · plate', desc: 'Twin plates from the old guard armory. Heavy, loud and very reassuring.' },
   cloak: { name: 'Wanderer Cloak', kind: 'back · wool', desc: 'Heavy wool, frayed at the hem. Keeps off the rain, the cold, and most questions.' },

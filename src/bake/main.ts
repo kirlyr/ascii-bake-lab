@@ -110,14 +110,23 @@ $('save').onclick = async () => {
   renderer.render(ctx.scene, ctx.camera);
   return canvas.toDataURL();
 };
-// Inspeksi dekat satu tulang (mis. cek helm menembus kepala): window.__closeup('Head', yaw, layers?, size?) → dataURL.
-(window as unknown as Record<string, unknown>).__closeup = (bone: string, yaw: number, layers?: string[], size = 0.5) => {
+// Posisi tulang (ruang model, sebelum animasi) untuk merancang aset prosedural: window.__bones() → {nama: [x,y,z]}.
+const rest = new Map<string, number[]>();
+ctx.root.updateMatrixWorld(true);
+ctx.root.traverse((o) => {
+  if ((o as THREE.Bone).isBone) rest.set(o.name, ctx.root.worldToLocal(o.getWorldPosition(new THREE.Vector3())).toArray());
+});
+(window as unknown as Record<string, unknown>).__bones = () => Object.fromEntries(rest);
+// Inspeksi dekat satu tulang (mis. cek helm menembus kepala): window.__closeup('Head', yaw, layers?, size?, clip?, t?) → dataURL.
+// clip/t opsional: cek pose lain (mis. jubah saat berjalan), kain ikut disimulasikan.
+(window as unknown as Record<string, unknown>).__closeup = (bone: string, yaw: number, layers?: string[], size = 0.5, clip = 'idle', t = 0) => {
   const p = readParams();
   showLayers(p, layers);
   ctx.mixer.stopAllAction();
-  ctx.mixer.clipAction(ctx.animations.find((a) => a.name === p.clips.idle)!).reset().play();
-  ctx.mixer.setTime(0);
+  ctx.mixer.clipAction(ctx.animations.find((a) => a.name === p.clips[clip])!).reset().play();
+  ctx.mixer.setTime(t);
   ctx.root.updateMatrixWorld(true);
+  for (const c of ctx.cloth) c.apply(p.clips[clip], t);
   const target = ctx.root.getObjectByName(bone)!.getWorldPosition(new THREE.Vector3());
   const cam = new THREE.OrthographicCamera(-size / 2, size / 2, size / 2, -size / 2, 0.01, 20);
   const r = (yaw * Math.PI) / 180;

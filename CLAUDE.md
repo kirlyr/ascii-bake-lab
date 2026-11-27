@@ -50,8 +50,8 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Home bisa diputar (2026-11-27, user minta): `hero-turn.bake` dimuat setelah karakter tampil. Logika putar bersama di
   `src/shared/turn.ts`. Efek rune/aura: halo bloom + glyph besar, level Faint/Bright/Radiant per efek (user minta).
 - Equipment tambahan (2026-11-27, user minta): helm diperbesar (tidak menembus kepala), 5 zirah dada CC0 di slot Chest,
-  jubah prosedural (buatan sendiri) di slot baru Back (`back`), satu slot dengan sayap bulu (user: biarkan, tapi tema dark medieval → default jubah, sayap hitam).
-  Legs/feet: versi gratis Quaternius sudah habis terpakai.
+  jubah prosedural (buatan sendiri, simulasi kain Verlet saat bake di `src/bake/cloth.ts`, user minta) di slot baru Back (`back`), satu slot dengan sayap bulu (user: biarkan, tapi tema dark medieval → default jubah, sayap hitam).
+  Legs/feet: versi gratis Quaternius habis, jadi pelat kaki + sepatu besi dibuat prosedural (`make_greaves.py`, attachment `rest: true`), dipilih user.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
