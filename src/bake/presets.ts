@@ -4,11 +4,12 @@ import { DEFAULT_PARAMS, type BakeParams } from './bake';
 
 export const PRESETS: Record<string, BakeParams> = {
   hero: DEFAULT_PARAMS,
-  // Putar karakter: 16 arah, 4 frame idle merata sepanjang clip (napas). Bake 0..-180 per 22,5°, sisi lain = mirror.
+  // Putar karakter: 16 arah penuh, 4 frame idle merata sepanjang clip (napas). Tanpa mirror, karena karakter tidak
+  // simetris (pauldron satu sisi, senjata di tangan kanan): mirror memindahkan item ke sisi lain saat diputar.
   'hero-turn': {
     ...DEFAULT_PARAMS,
     clips: { idle: 'idle' },
-    views: Array.from({ length: 9 }, (_, i) => -22.5 * i),
+    views: Array.from({ length: 16 }, (_, i) => -22.5 * i),
     stillFrames: 4,
   },
 };

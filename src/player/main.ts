@@ -22,8 +22,12 @@ const turn = turnBake?.data ?? null;
 await document.fonts.load('700 10px "JetBrains Mono"');
 
 const sprite = decodeSprite(file, main.planes);
-// yaw view (0..-180) → sprite. Arah +yaw = mirror dari -yaw.
-const turnViews = new Map<number, Sprite>((turn?.views ?? []).map((v) => [v.yaw ?? 0, decodeSprite(v, turnBake!.planes)]));
+// yaw (-180..180] → sprite. 16 arah di-bake semua (tanpa mirror) supaya item satu sisi tidak pindah sisi.
+const normYaw = (y: number) => {
+  const n = ((((y + 180) % 360) + 360) % 360) - 180;
+  return n === -180 ? 180 : n;
+};
+const turnViews = new Map<number, Sprite>((turn?.views ?? []).map((v) => [normYaw(v.yaw ?? 0), decodeSprite(v, turnBake!.planes)]));
 // Grid cukup lebar untuk semua arah; tiap file disejajarkan lewat origin (titik antara kaki).
 const cols = Math.max(file.cols, ...(turn?.views ?? []).map((v) => v.cols));
 const grid = createGrid(cols, file.rows);
@@ -390,8 +394,12 @@ function paint() {
   state.rune?.draw(view.ctx, grid, view.cellW, view.cellH, view.background);
 }
 function compose() {
-  const mirror = state.yaw > 0 && state.yaw < 180;
-  const src = isSide() || !turn ? sprite : turnViews.get(mirror || state.yaw === 180 ? -state.yaw : state.yaw)!;
+  // hero.bake (animasi penuh) hanya di arah bake-nya, plus saat berjalan ke arah sebaliknya (mirror, seperti
+  // game 2D). Arah lain, termasuk sisi sebaliknya saat idle, memakai view putar supaya tidak ada lompatan sisi.
+  const tv = turn && turnViews.get(state.yaw);
+  const useHero = !tv || state.yaw === SIDE || (isSide() && state.clip !== 'idle');
+  const mirror = useHero && state.yaw === -SIDE;
+  const src = useHero ? sprite : tv;
   const f = src.file;
   const [ox, oy] = f.origin ?? [f.cols / 2, f.rows];
   const dx = Math.round(cols / 2 - (mirror ? f.cols - ox : ox));
