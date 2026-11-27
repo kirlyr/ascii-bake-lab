@@ -1,12 +1,13 @@
 // Player produksi: memutar hasil bake (.bake) sebagai teks di canvas. Tanpa Three.js.
 import { loadBake, type BakeFile, type TurnFile } from '../shared/format';
-import { activeLayers, composeFrame, createGrid, decodeSprite, type Sprite } from '../shared/compose';
+import { createGrid, decodeSprite } from '../shared/compose';
+import { STEP, composeTurn, dragToRotate, normYaw, sideYaw, turnCols, turnSprites } from '../shared/turn';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
-import { AURAS, RUNES, RuneEmitter, alongBlade, alongEdge, type AuraKey, type RuneKey, type Spawn } from '../shared/runes';
+import { AURAS, LEVELS, RUNES, RuneEmitter, alongBlade, alongEdge, type AuraKey, type EffectLevel, type RuneKey, type Spawn } from '../shared/runes';
 import { BLADE_MATERIALS, DYEABLE, DYES, MATERIALS, type MaterialKey } from '../shared/materials';
 import { SLOTS, itemText } from '../shared/items';
 import { drawIcon, layerParts } from '../shared/icons';
-import { loadLoadout, materialsFor, saveLoadout } from '../shared/loadout';
+import { levelOf, loadLoadout, materialsFor, saveLoadout } from '../shared/loadout';
 
 const MODEL = new URLSearchParams(location.search).get('model') ?? 'hero';
 const URL_BAKE = `${import.meta.env.BASE_URL}baked/${MODEL}.bake`;
@@ -22,18 +23,13 @@ const turn = turnBake?.data ?? null;
 await document.fonts.load('700 10px "JetBrains Mono"');
 
 const sprite = decodeSprite(file, main.planes);
-// yaw (-180..180] → sprite. 16 arah di-bake semua (tanpa mirror) supaya item satu sisi tidak pindah sisi.
-const normYaw = (y: number) => {
-  const n = ((((y + 180) % 360) + 360) % 360) - 180;
-  return n === -180 ? 180 : n;
-};
-const turnViews = new Map<number, Sprite>((turn?.views ?? []).map((v) => [normYaw(v.yaw ?? 0), decodeSprite(v, turnBake!.planes)]));
+const turnViews = turn ? turnSprites(turn, turnBake!.planes) : null;
 // Grid cukup lebar untuk semua arah; tiap file disejajarkan lewat origin (titik antara kaki).
-const cols = Math.max(file.cols, ...(turn?.views ?? []).map((v) => v.cols));
+const cols = turnCols(file, turn);
 const grid = createGrid(cols, file.rows);
 const view = new AsciiCanvas($<HTMLCanvasElement>('#stage'), file.cellAspect);
 view.resize(cols, file.rows);
-const SIDE = file.facing === 'right' ? -90 : 90;
+const SIDE = sideYaw(file);
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Kustomisasi di sini (Tavern) disimpan sebagai loadout, Home memakai loadout yang sama.
@@ -92,7 +88,7 @@ function changed() {
   draw();
 }
 
-const SLOT_SIDE = { 'slots-l': ['helmet', 'shoulder', 'torso'], 'slots-r': ['weapon', 'legs', 'feet'] };
+const SLOT_SIDE = { 'slots-l': ['helmet', 'shoulder', 'torso', 'back'], 'slots-r': ['weapon', 'legs', 'feet'] };
 function renderSlots() {
   for (const [id, slots] of Object.entries(SLOT_SIDE)) {
     const el = $<HTMLElement>(`#${id}`);
@@ -140,6 +136,11 @@ filterEl.addEventListener('click', (e) => {
 const detailEl = $<HTMLElement>('#detail');
 const choice = (attr: string, value: string, label: string, on: boolean, extra = '') =>
   `<button data-${attr}="${value}" aria-pressed="${on}" ${extra}>${label}</button>`;
+/** Pilihan intensitas efek. key = 'rune' atau slot aura. */
+const levelRow = (key: string) =>
+  `<div class="row level" role="group" aria-label="Intensity">${Object.entries(LEVELS)
+    .map(([n, label]) => choice('level', n, label, levelOf(lo, key) === +n, `data-key="${key}"`))
+    .join('')}</div>`;
 function renderDetail() {
   if (!selected) {
     detailEl.innerHTML = '<p class="muted">Select an item.</p>';
@@ -162,6 +163,7 @@ function renderDetail() {
     html += `<h3>Rune</h3><div class="row">${choice('rune', '', 'None', !lo.rune)}${Object.entries(RUNES)
       .map(([r, d]) => choice('rune', r, d.label, lo.rune === r))
       .join('')}</div>`;
+    if (lo.rune) html += levelRow('rune');
   }
   for (const part of parts.filter((p) => DYEABLE[p])) {
     const d = DYEABLE[part];
@@ -176,6 +178,7 @@ function renderDetail() {
     html += `<h3>Aura</h3><div class="row">${choice('aura', '', 'None', !lo.auras[slot])}${Object.entries(AURAS)
       .map(([a, d]) => choice('aura', a, d.label, lo.auras[slot] === a))
       .join('')}</div>`;
+    if (lo.auras[slot]) html += levelRow(slot);
     if (!worn) html += '<p class="muted note">Aura and rune show once the item is equipped.</p>';
   } else {
     html += '<p class="muted note">Runes and auras are off because reduced motion is on.</p>';
@@ -194,6 +197,11 @@ detailEl.addEventListener('click', (e) => {
   else if (d.rune !== undefined) setRune((d.rune || null) as RuneKey | null);
   else if (d.part) lo.dye[d.part] = d.dye!;
   else if (d.aura !== undefined) setAura(slot, (d.aura || null) as AuraKey | null);
+  else if (d.level) {
+    lo.levels[d.key!] = +d.level as EffectLevel;
+    if (d.key === 'rune') setRune(lo.rune);
+    else setAura(d.key!, lo.auras[d.key!] ?? null);
+  }
   else return;
   save();
   if (d.blade || d.part) applyLook();
@@ -293,14 +301,14 @@ document.addEventListener('drop', (e) => {
 });
 
 function setAura(slot: string, aura: AuraKey | null) {
-  if (aura) state.auras[slot] = new RuneEmitter(AURAS[aura]);
+  if (aura) state.auras[slot] = new RuneEmitter(AURAS[aura], levelOf(lo, slot));
   else delete state.auras[slot];
   if (aura) lo.auras[slot] = aura;
   else delete lo.auras[slot];
 }
 function setRune(r: RuneKey | null) {
   lo.rune = r;
-  state.rune = r && !reducedMotion ? new RuneEmitter(RUNES[r]) : null;
+  state.rune = r && !reducedMotion ? new RuneEmitter(RUNES[r], levelOf(lo, 'rune')) : null;
 }
 if (!reducedMotion) for (const [slot, aura] of Object.entries(lo.auras)) setAura(slot, aura);
 setRune(lo.rune);
@@ -354,11 +362,10 @@ addEventListener('keyup', (e) => {
 
 // Putar: drag di canvas atau tombol ⟲ ⟳, per 22,5°. Animasi hanya di arah samping (hero.json);
 // arah lain = idle napas 4 frame dari hero-turn.json.
-const norm = (y: number) => ((((y + 180) % 360) + 360) % 360) - 180;
 const isSide = () => Math.abs(state.yaw) === 90;
 const yawEl = $<HTMLElement>('#yaw');
 function setYaw(y: number) {
-  state.yaw = norm(y) === -180 ? 180 : norm(y);
+  state.yaw = normYaw(y);
   if (!isSide() && state.clip !== 'idle') setClip('idle');
   document.querySelectorAll<HTMLButtonElement>('[data-dir]').forEach((b) =>
     b.setAttribute('aria-pressed', String(isSide() && (b.dataset.dir === file.facing) === (state.yaw === SIDE))),
@@ -366,26 +373,10 @@ function setYaw(y: number) {
   yawEl.textContent = `${state.yaw}°`;
   draw();
 }
-const STEP = 22.5;
 const rotate = (dir: number) => turn && setYaw(state.yaw + dir * STEP);
 $<HTMLButtonElement>('#rot-l').onclick = () => rotate(1);
 $<HTMLButtonElement>('#rot-r').onclick = () => rotate(-1);
-const stage = $<HTMLCanvasElement>('#stage');
-let dragX: number | null = null;
-stage.addEventListener('pointerdown', (e) => {
-  if (!turn) return;
-  dragX = e.clientX;
-  stage.setPointerCapture(e.pointerId);
-});
-stage.addEventListener('pointermove', (e) => {
-  if (dragX === null) return;
-  const steps = Math.trunc((e.clientX - dragX) / 24);
-  if (!steps) return;
-  dragX += steps * 24;
-  rotate(-steps); // drag ke kanan = karakter berputar ke kanan (searah jarum jam dari atas)
-});
-stage.addEventListener('pointerup', () => (dragX = null));
-stage.addEventListener('pointercancel', () => (dragX = null));
+if (turn) dragToRotate($<HTMLCanvasElement>('#stage'), rotate);
 if (!turn) $<HTMLElement>('#turn').hidden = true;
 
 function paint() {
@@ -394,19 +385,7 @@ function paint() {
   state.rune?.draw(view.ctx, grid, view.cellW, view.cellH, view.background);
 }
 function compose() {
-  // hero.bake (animasi penuh) hanya di arah bake-nya, plus saat berjalan ke arah sebaliknya (mirror, seperti
-  // game 2D). Arah lain, termasuk sisi sebaliknya saat idle, memakai view putar supaya tidak ada lompatan sisi.
-  const tv = turn && turnViews.get(state.yaw);
-  const useHero = !tv || state.yaw === SIDE || (isSide() && state.clip !== 'idle');
-  const mirror = useHero && state.yaw === -SIDE;
-  const src = useHero ? sprite : tv;
-  const f = src.file;
-  const [ox, oy] = f.origin ?? [f.cols / 2, f.rows];
-  const dx = Math.round(cols / 2 - (mirror ? f.cols - ox : ox));
-  const dy = Math.round((file.origin?.[1] ?? file.rows) - oy);
-  // View putar: beberapa frame idle (napas) dengan fps sendiri; waktu diturunkan dari frame hero.
-  const [clip, frame] = src === sprite ? [state.clip, state.frame] : ['idle', Math.floor((state.frame * f.fps) / file.fps)];
-  composeFrame(src, grid, clip, frame, activeLayers(f, state.equip), mirror, dx, dy);
+  composeTurn(grid, sprite, turnViews, state.yaw, state.clip, state.frame, state.equip);
   for (const slot of Object.keys(state.auras)) {
     const layer = state.equip[slot];
     auraSpawn[slot] = layer ? alongEdge(grid, layer) : null;

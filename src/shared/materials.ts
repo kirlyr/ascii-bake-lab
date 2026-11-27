@@ -52,6 +52,8 @@ export const DEFAULT_LOOK: Record<string, MaterialKey> = {
   gem: 'ruby',
   visor: 'visor',
   trim: 'brass',
+  cloak: 'wool',
+  feather: 'linen',
 };
 
 /**
@@ -67,6 +69,8 @@ export const DYES = {
   tan: { label: 'Tan', colors: ['#4e3220', '#946038', '#d8a870'] },
   brown: { label: 'Umber', colors: ['#3e3024', '#7a6048', '#c0a080'] },
   parchment: { label: 'Parchment', colors: ['#4e4432', '#a89870', '#ead9b5'] },
+  snow: { label: 'Snow', colors: ['#5a5a58', '#c8c8c0', '#ffffff'] },
+  raven: { label: 'Raven', colors: ['#18181c', '#3a3a44', '#76768a'] },
   charcoal: { label: 'Charcoal', colors: ['#2a2622', '#5a544c', '#b0a898'] },
 } satisfies Record<string, Material>;
 
@@ -87,6 +91,8 @@ export const DYEABLE: Record<string, { label: string; palette: Record<string, Ma
   armor: { label: 'Plate', palette: FINISHES, initial: 'iron' },
   helmet: { label: 'Metal', palette: FINISHES, initial: 'iron' },
   trim: { label: 'Trim', palette: FINISHES, initial: 'gold' },
+  cloak: { label: 'Cloak', palette: DYES, initial: 'charcoal' },
+  feather: { label: 'Feather', palette: DYES, initial: 'raven' },
 };
 
 /** Material per part. `overrides` = key MATERIALS atau Material langsung (pewarna). */

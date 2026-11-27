@@ -118,12 +118,21 @@ Player (`/`) = Tavern wardrobe bergaya inventory game (UI berbahasa Inggris, tan
 
 ![tavern inventory](docs/media/tavern-inventory.png)
 
+## Efek rune & aura
+
+`RuneEmitter` (`src/shared/runes.ts`) menggambar 4 lapis: sel di bawah glyph dikosongkan, halo (sprite gradien radial,
+blend `lighter`, efek bloom), glyph kecil yang di-snap ke sel, dan sesekali glyph besar 2× yang melayang bebas.
+Intensitas per efek bisa dipilih di panel detail: **Faint / Bright / Radiant** (`LEVELS`), mengalikan jumlah partikel,
+sebaran, umur, peluang glyph besar, dan ukuran halo. Disimpan di loadout (`levels`, key = slot aura atau `rune`).
+
+![level efek](docs/media/effect-levels.png)
+
 ## Loadout (Tavern → Home)
 
 Semua pilihan di player (equipment, pewarna, material blade, aura, rune) disimpan sebagai loadout di `localStorage`
 pengunjung (`src/shared/loadout.ts`, key `ascii-hero-loadout`) dan langsung dipulihkan saat halaman dibuka lagi.
-`/home.html` (prototype Home) hanya memuat `hero.bake`, sudut samping, idle, tanpa kontrol, dan memakai loadout yang
-sama. Jadi player = Tavern = tempat kustomisasi karakter Home. Nilai yang tidak dikenal lagi (layer dihapus, palet
+`/home.html` (prototype Home) memuat `hero.bake` dulu (karakter langsung tampil), lalu `hero-turn.bake` di belakang
+layar; setelah itu karakter bisa diputar (drag atau ⟲ ⟳). Memakai loadout yang sama. Jadi player = Tavern = tempat kustomisasi karakter Home. Nilai yang tidak dikenal lagi (layer dihapus, palet
 diganti) jatuh ke default bake. Tiap pengunjung punya loadout sendiri; tanpa loadout tersimpan = susunan default.
 
 ![home dengan loadout](docs/media/home-loadout.png)
@@ -164,6 +173,9 @@ Satu karakter proporsi realistis (bukan chibi), tinggi 90 baris. Semua aset **CC
 | Baju, celana, sepatu, bahu | Modular Character Outfits – Fantasy, outfit `Male_Ranger` + `Male_Peasant` | `assets/models/quaternius-outfits/` |
 | Helm, pedang, bahu | Animated Knight Pack (`Helmet1–3`, `Sword`, `ShortSword`, `Katana`, `Club`, `ShoulderPads`) | `assets/models/quaternius/` |
 | Kapak, tombak, palu, sabit, mahkota | Modular Weapons Pack + Ultimate RPG Pack | `assets/models/quaternius-weapons/` |
+| Zirah dada (5) | Ultimate RPG Pack (`Armor_*`, item statis di `spine_03`) | `assets/models/quaternius-weapons/` |
+| Jubah | buatan sendiri, prosedural (`make_cloak.py`) | `assets/models/cloak/` |
+| Sayap bulu | buatan sendiri, prosedural (`make_wings.py`) | `assets/models/wings/` |
 
 Sumber unduhan dan catatan lisensi ada di `SOURCE.md` tiap folder (diambil dari mirror GitHub karena situs Quaternius
 tidak bisa diakses dari cloud). Versi gratis Modular Outfits hanya berisi Ranger dan Peasant; outfit armor penuh ada di
@@ -181,13 +193,13 @@ Perbaikan karakter (PR #5):
 
 ![sebelum dan sesudah](docs/media/hero-before-after.png)
 
-## Hasil saat ini (hero, 22 layer × 2 clip @12fps)
+## Hasil saat ini (hero, 30 layer × 2 clip @12fps)
 
 | | |
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
-| `hero.bake` | **195 KB** (JSON base64 + gzip sebelumnya: 280 KB) |
-| `hero-turn.bake` | 16 arah × 22 layer × 4 frame = **342 KB** (9 arah + mirror sebelumnya: 195 KB) |
+| `hero.bake` | 30 layer × 2 clip = **298 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
+| `hero-turn.bake` | 16 arah × 30 layer × 4 frame = **528 KB** (22 layer: 342 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan

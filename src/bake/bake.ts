@@ -47,7 +47,8 @@ export interface Attachment {
   /** offset di ruang tulang. rotation dalam derajat (XYZ). */
   position: [number, number, number];
   rotation: [number, number, number];
-  scale: number;
+  /** angka = seragam; [x, y, z] = per sumbu ruang tulang (mis. zirah dibuat lebih tebal). */
+  scale: number | [number, number, number];
   /** derajat. Putar aksesori di sumbu panjangnya (Y setelah node -90° X) sebelum `rotation`. */
   spin?: number;
 }
@@ -145,7 +146,7 @@ const UBC = '/assets/models/quaternius-ubc';
 const UAL = `${UBC}/UAL_subset.glb`;
 const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'].flatMap((f) => [1, 2, 3].map((i) => `${f}_0${i}_r`));
 // Semua helm/senjata Knight Pack punya origin + skala sama, jadi satu posisi attach per slot.
-const helm = (name: string, url: string): Attachment => ({ name, url, bone: 'Head', position: [0, 0.1, 0.02], rotation: [0, 0, 0], scale: 0.14 });
+const helm = (name: string, url: string): Attachment => ({ name, url, bone: 'Head', position: [0, 0.095, 0.0], rotation: [0, 0, 0], scale: 0.165 });
 // Dengan pose kepalan Sword_Idle: blade turun ke depan, sisi lebar menghadap kamera (Z 90°).
 const weapon = (name: string, url: string, spin = 0): Attachment => ({ name, url, bone: 'hand_r', position: [0, 0.08, 0.03], rotation: [25, 0, 90], scale: 0.22, spin });
 // Modular Weapons Pack + Ultimate RPG Pack (CC0): konvensi node sama dengan Knight Pack, ukuran sedikit lebih besar.
@@ -188,7 +189,20 @@ export const DEFAULT_PARAMS: BakeParams = {
     { ...weapon('spear', `${W}/Spear.glb`), rotation: [0, 0, 180], scale: 0.18 },
     { ...helm('crown', `${W}/Crown.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
     { ...helm('crown2', `${W}/Crown2.glb`), position: [0, 0.17, 0.02], scale: 0.2 },
+    // Jubah buatan sendiri (assets/models/cloak/make_cloak.py), sudah Y-atas dalam meter. Kaku, ikut dada.
+    { name: 'cloak', url: '/assets/models/cloak/Cloak.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
+    // Sayap bulu buatan sendiri (assets/models/wings/make_wings.py), sudah Y-atas dalam meter. Satu slot dengan jubah.
+    { name: 'wings', url: '/assets/models/wings/Wings.glb', bone: 'spine_03', position: [0, 0.02, 0], rotation: [0, 0, 0], scale: 1 },
     // Bantalan bahu Knight Pack: satu mesh melintang kedua bahu, ditempel ke tulang dada atas, miring 45°.
+    // Zirah dada Ultimate RPG Pack (item statis, tidak di-rig): ditempel ke tulang dada atas.
+    ...['Black', 'Golden', 'Leather', 'Metal', 'Metal2'].map((m): Attachment => ({
+      name: `cuirass_${m.toLowerCase()}`,
+      url: `${W}/Armor_${m}.glb`,
+      bone: 'spine_03',
+      position: [0, -0.055, -0.015],
+      rotation: [0, 0, 0],
+      scale: [0.58, 0.6, 0.72],
+    })),
     { name: 'pads', url: `${Q}/ShoulderPads.glb`, bone: 'spine_03', position: [0, 0.13, 0], rotation: [45, 0, 0], scale: 0.28 },
   ],
   layers: {
@@ -202,16 +216,23 @@ export const DEFAULT_PARAMS: BakeParams = {
       parts: { cloth: ['Male_Ranger_Body'], leather: ['Male_Ranger_Body_Belt_1', 'Male_Ranger_Body_Belt_2', 'Male_Ranger_Arms_Bracer'] },
     },
     peasant_torso: { label: 'Tunik Petani', slot: 'torso', bias: 0.04, parts: { linen: ['Male_Peasant_Body', 'Male_Peasant_Arms_1'] } },
+    cuirass_leather: { bias: 0.04, label: 'Leather Cuirass', slot: 'torso', parts: { leather: ['cuirass_leather:Brown'] } },
+    cuirass_metal: { bias: 0.04, label: 'Iron Cuirass', slot: 'torso', parts: { armor: ['cuirass_metal:DarkSteel'] } },
+    cuirass_metal2: { bias: 0.04, label: 'Steel Cuirass', slot: 'torso', parts: { armor: ['cuirass_metal2:LightSteel'] } },
+    cuirass_black: { bias: 0.04, label: 'Blackguard Cuirass', slot: 'torso', parts: { armor: ['cuirass_black:Black'], gem: ['cuirass_black:DarkRed'] } },
+    cuirass_golden: { bias: 0.04, label: 'Golden Cuirass', slot: 'torso', parts: { trim: ['cuirass_golden:Golden'] } },
     ranger_legs: { label: 'Celana Ranger', slot: 'legs', bias: 0.04, parts: { cloth: ['Male_Ranger_Legs'] } },
     peasant_legs: { label: 'Celana Petani', slot: 'legs', bias: 0.04, parts: { wool: ['Male_Peasant_Legs'] } },
     ranger_feet: { label: 'Sepatu Ranger', slot: 'feet', bias: 0.04, parts: { leather: ['Male_Ranger_Feet_Boots'] } },
     peasant_feet: { label: 'Sepatu Petani', slot: 'feet', bias: 0.04, parts: { wool: ['Male_Peasant_Feet'] } },
     ranger_pauldron: { label: 'Pauldron Ranger', slot: 'shoulder', bias: 0.04, parts: { armor: ['Male_Ranger_Acc_Pauldron'] } },
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
+    cloak: { label: 'Cloak', slot: 'back', parts: { cloak: ['cloak:Cloth'] } },
+    wings: { label: 'Feathered Wings', slot: 'back', parts: { feather: ['wings:Feather', 'wings:Bone'] } },
     // Varian per slot = layer terpisah. Ukuran file = jumlah layer, bukan kombinasi.
-    helmet1: { label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
-    helmet2: { label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
-    helmet3: { label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
+    helmet1: { bias: 0.02, label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
+    helmet2: { bias: 0.02, label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
+    helmet3: { bias: 0.02, label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
     crown: { label: 'Mahkota', slot: 'helmet', parts: { trim: ['crown:Gold'] } },
     crown2: { label: 'Mahkota Rubi', slot: 'helmet', parts: { trim: ['crown2:Gold'], gem: ['crown2:Red'] } },
     // Pedang Quaternius: blade sudah mesh terpisah, sumbu lokal +Z. `at` = pangkal blade (sumber socket).
@@ -452,7 +473,8 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     acc.rotation.y = THREE.MathUtils.degToRad(a.spin ?? 0);
     holder.position.fromArray(a.position);
     holder.rotation.set(...(a.rotation.map(THREE.MathUtils.degToRad) as [number, number, number]));
-    holder.scale.setScalar(a.scale);
+    if (typeof a.scale === 'number') holder.scale.setScalar(a.scale);
+    else holder.scale.set(...a.scale);
     bone.add(holder);
     acc.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -817,8 +839,16 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
     r.setRenderTarget(null);
   };
 
-  // Auto-levels dari pose pertama (semua layer), supaya kontras konsisten antar frame.
-  setVisible(ctx, allLayerMeshes);
+  // Auto-levels dari pose pertama dengan susunan default (layer tanpa slot + varian pertama tiap slot), supaya
+  // kontras konsisten antar frame dan tidak bergeser setiap ada item baru (mis. sayap putih atau zirah hitam).
+  const seenSlot = new Set<string>();
+  const defaultMeshes = new Set(
+    Object.values(p.layers)
+      .filter((l) => !l.slot || (!seenSlot.has(l.slot) && seenSlot.add(l.slot)))
+      .flatMap(layerMeshes)
+      .filter((m) => allLayerMeshes.has(m)),
+  );
+  setVisible(ctx, defaultMeshes);
   poseAt(ctx, Object.values(p.clips)[0], 0);
   render();
   const lums: number[] = [];

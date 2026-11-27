@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,8 +10,13 @@
   <main>
     <section class="panel stage-panel">
       <h1>┤ CHARACTER ├</h1>
-      <canvas id="stage" aria-label="Karakter ASCII"></canvas>
-      <p class="muted">Susunan karakter diambil dari Tavern. <a href="./">Kustomisasi di Tavern →</a></p>
+      <canvas id="stage" aria-label="ASCII character. Drag sideways to turn."></canvas>
+      <div class="turn row" id="turn" role="group" aria-label="Turn character" hidden>
+        <button id="rot-l" aria-label="Turn left">⟲</button>
+        <button id="rot-r" aria-label="Turn right">⟳</button>
+        <span class="muted">or drag the hero</span>
+      </div>
+      <p class="muted">Your hero is dressed in the Tavern. <a href="./">Visit the Tavern →</a></p>
     </section>
   </main>
   <script type="module" src="/src/home/main.ts"></script>
