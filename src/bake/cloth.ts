@@ -17,6 +17,8 @@ export interface ClothSpec {
   pinRows: number;
   /** tarikan ke bentuk kaku per detik di baris paling bawah (atas lebih kaku). 0 = kain bebas. */
   shape: number;
+  /** hambatan udara per detik (default 1,6). Kecil = kain berat, berayun lebih lama. */
+  drag?: number;
   /** clip → kecepatan maju model (m/s). Clip in-place: angin semu dari depan supaya kain tertinggal ke belakang. */
   wind?: Record<string, number>;
   /** kapsul tabrakan: dua tulang + radius (m). */
@@ -26,8 +28,7 @@ export interface ClothSpec {
 const DT = 1 / 120;
 const ITER = 12;
 const GRAVITY = -9.8;
-const DRAG = 1.6; // hambatan udara per detik
-const WARMUP = 2; // siklus clip sebelum direkam, supaya kain sudah mengendap
+const SETTLE = 2.5; // detik minimal (dan ≥ 2 siklus) sebelum direkam, supaya kain sudah mengendap
 
 export class Cloth {
   private mesh: THREE.Mesh;
@@ -91,6 +92,8 @@ export class Cloth {
     const steps = Math.max(1, Math.round(D / DT));
     const dt = D / steps;
     const wind = this.spec.wind?.[clipName] ?? 0;
+    const drag = this.spec.drag ?? 1.6;
+    const WARMUP = Math.max(2, Math.ceil(SETTLE / D));
     const N = this.n * 3;
     const target = new Float32Array(N);
     pose(0);
@@ -120,7 +123,7 @@ export class Cloth {
         for (let d = 0; d < 3; d++) {
           const vel = (x[o + d] - prev[o + d]) / dt;
           const air = d === 2 ? -wind : 0;
-          const acc = (d === 1 ? GRAVITY : 0) + DRAG * (air - vel);
+          const acc = (d === 1 ? GRAVITY : 0) + drag * (air - vel);
           prev[o + d] = x[o + d];
           x[o + d] += vel * dt + acc * dt * dt;
           x[o + d] += (target[o + d] - x[o + d]) * shapeK[i];

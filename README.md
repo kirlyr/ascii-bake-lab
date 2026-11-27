@@ -199,8 +199,8 @@ Perbaikan karakter (PR #5):
 | | |
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
-| `hero.bake` | 32 layer × 2 clip = **324 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
-| `hero-turn.bake` | 16 arah × 32 layer × 4 frame = **571 KB** (22 layer: 342 KB) |
+| `hero.bake` | 32 layer × 2 clip = **330 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
+| `hero-turn.bake` | 16 arah × 32 layer × 4 frame = **569 KB** (22 layer: 342 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan
