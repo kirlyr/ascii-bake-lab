@@ -52,6 +52,7 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Equipment tambahan (2026-11-27, user minta): helm diperbesar (tidak menembus kepala), 5 zirah dada CC0 di slot Chest,
   jubah prosedural (buatan sendiri, simulasi kain Verlet saat bake di `src/bake/cloth.ts`, user minta) di slot baru Back (`back`), satu slot dengan sayap malaikat jatuh terlipat (`restClip: idle`, user minta diperbaiki; tema dark medieval → default jubah, sayap hitam). Pass depth/ID bake dua sisi (jubah sempat tembus dari belakang).
   Legs/feet: versi gratis Quaternius habis, jadi pelat kaki + sepatu besi dibuat prosedural (`make_greaves.py`, attachment `rest: true`), dipilih user.
+- Rambut (2026-11-27, user pilih): rambut UBC gratis (Simple Parted bawaan, Buzzed, Long) + janggut, slot Hair/Beard, pewarna rambut (bawaan hitam). Helm besi `hides: [hair]`; mahkota tidak.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)

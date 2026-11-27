@@ -47,6 +47,8 @@ export interface LayerData {
   label: string;
   /** slot equipment. Layer dengan slot sama = varian; player memasang maksimal satu per slot. Tanpa slot = selalu tampil. */
   slot?: string;
+  /** slot lain yang disembunyikan selama layer ini terpasang (mis. helm menutup rambut). */
+  hides?: string[];
   /**
    * Prioritas compose dalam unit depth: layer ini menang atas layer lain yang lebih dekat
    * asal selisihnya ≤ bias. Untuk armor yang ditembus badan (mesh badan sedikit lebih besar dari outfit).

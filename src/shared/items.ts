@@ -3,6 +3,8 @@
 
 export const SLOTS = [
   { key: 'helmet', label: 'Head' },
+  { key: 'hair', label: 'Hair' },
+  { key: 'beard', label: 'Beard' },
   { key: 'shoulder', label: 'Shoulders' },
   { key: 'torso', label: 'Chest' },
   { key: 'back', label: 'Back' },
@@ -34,6 +36,10 @@ export const ITEMS: Record<string, ItemText> = {
   plate_feet: { name: 'Iron Sabatons', kind: 'feet · plate', desc: 'Overlapping lames from heel to toe. Ruinous on stairs, glorious on toes.' },
   ranger_pauldron: { name: 'Ranger Pauldron', kind: 'shoulders · plate', desc: 'A single plate on the bow arm. Turns a stray arrow, not much more.' },
   knight_pads: { name: 'Knight Pauldrons', kind: 'shoulders · plate', desc: 'Twin plates from the old guard armory. Heavy, loud and very reassuring.' },
+  hair_parted: { name: 'Parted Hair', kind: 'hair', desc: 'Short and parted to the side. Neat enough for a feast hall, messy enough for the road.' },
+  hair_buzzed: { name: 'Buzzed Hair', kind: 'hair', desc: 'Cropped close, the way the old garrison barber liked it. Fits under any helm.' },
+  hair_long: { name: 'Long Hair', kind: 'hair', desc: 'Grown out over many winters on the road. Catches the wind, and sometimes the brambles.' },
+  beard: { name: 'Beard', kind: 'beard', desc: 'Full and close-trimmed. Keeps the chin warm on long night watches.' },
   cloak: { name: 'Wanderer Cloak', kind: 'back · wool', desc: 'Heavy wool, frayed at the hem. Keeps off the rain, the cold, and most questions.' },
   wings: { name: 'Fallen Wings', kind: 'back · feather', desc: 'Folded pinions of a fallen guardian, torn at the edges. They do not lift you, but every tavern goes quiet.' },
   helmet1: { name: 'Iron Helm', kind: 'head · plate', desc: 'Hammered from one sheet of iron. Dented, but never broken.' },

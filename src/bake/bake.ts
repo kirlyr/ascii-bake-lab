@@ -14,6 +14,8 @@ export interface LayerDef {
    * player memasang maksimal satu per slot. Tanpa slot = selalu tampil (badan).
    */
   slot?: string;
+  /** slot lain yang disembunyikan selama layer ini terpasang (helm menutup rambut). */
+  hides?: string[];
   /** hanya layer senjata: split hilt/blade + sumber socket blade. */
   blade?: BladeSplit;
   /** meter. Layer ini menang atas layer yang lebih dekat ≤ jarak ini (lihat LayerData.bias). */
@@ -209,7 +211,8 @@ export const DEFAULT_PARAMS: BakeParams = {
     },
   ],
 
-  outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`],
+  // Rambut + janggut Universal Base Characters (sudah di-rig ke skeleton yang sama).
+  outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`, ...['SimpleParted', 'Buzzed', 'Long', 'Beard'].map((h) => `${UBC}/Hair_${h}.gltf`)],
   outfitInflate: 0.02,
   attachments: [
     ...['Helmet1', 'Helmet2', 'Helmet3'].map((h) => helm(h.toLowerCase(), `${Q}/${h}.glb`)),
@@ -254,7 +257,12 @@ export const DEFAULT_PARAMS: BakeParams = {
     { name: 'pads', url: `${Q}/ShoulderPads.glb`, bone: 'spine_03', position: [0, 0.13, 0], rotation: [45, 0, 0], scale: 0.28 },
   ],
   layers: {
-    body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes', 'Eyebrows'] } },
+    body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes'], hair: ['Eyebrows'] } },
+    // Rambut: varian pertama = bawaan (hitam lewat pewarna `hair`). Slot bisa dikosongkan (botak / tanpa janggut).
+    hair_parted: { label: 'Rambut Belah', slot: 'hair', parts: { hair: ['Hair_SimpleParted'] } },
+    hair_buzzed: { label: 'Rambut Cepak', slot: 'hair', parts: { hair: ['Hair_Buzzed'] } },
+    hair_long: { label: 'Rambut Panjang', slot: 'hair', parts: { hair: ['Hair_Long'] } },
+    beard: { label: 'Janggut', slot: 'beard', parts: { hair: ['Hair_Beard'] } },
     // Outfit dipecah per bagian (mesh Ranger/Peasant memang terpisah), jadi bisa mix and match.
     // Badan Superhero lebih besar dari tubuh untuk outfit ini: kulit menembus beberapa cm, jadi bias 4 cm.
     ranger_torso: {
@@ -282,9 +290,9 @@ export const DEFAULT_PARAMS: BakeParams = {
     cloak: { label: 'Cloak', slot: 'back', bias: 0.05, parts: { cloak: ['cloak:Cloth'] } },
     wings: { label: 'Fallen Wings', slot: 'back', bias: 0.06, parts: { feather: ['wings:Feather', 'wings:Bone'] } },
     // Varian per slot = layer terpisah. Ukuran file = jumlah layer, bukan kombinasi.
-    helmet1: { bias: 0.02, label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
-    helmet2: { bias: 0.02, label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
-    helmet3: { bias: 0.02, label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
+    helmet1: { bias: 0.02, hides: ['hair'], label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
+    helmet2: { bias: 0.02, hides: ['hair'], label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
+    helmet3: { bias: 0.02, hides: ['hair'], label: 'Helm Bangsawan', slot: 'helmet', parts: { helmet: ['helmet3:Grey', 'helmet3:Black'], trim: ['helmet3:Golden'] } },
     crown: { label: 'Mahkota', slot: 'helmet', parts: { trim: ['crown:Gold'] } },
     crown2: { label: 'Mahkota Rubi', slot: 'helmet', parts: { trim: ['crown2:Gold'], gem: ['crown2:Red'] } },
     // Pedang Quaternius: blade sudah mesh terpisah, sumbu lokal +Z. `at` = pangkal blade (sumber socket).
@@ -959,6 +967,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
       const meshes = new Set(layerMeshes(layer));
       out.layers[layerKey] = { label: layer.label, clips: {} };
       if (layer.slot) out.layers[layerKey].slot = layer.slot;
+      if (layer.hides) out.layers[layerKey].hides = layer.hides;
       if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
       setVisible(ctx, meshes);
       const blade = layer.blade && splits.has(layer.blade.mesh) ? bladeLocalOf(layer.blade) : null;

@@ -25,14 +25,24 @@ def cross(a, b):
     return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 
 
-def feather(root, tip, width, out, ragged=False, seg=12):
+def bend(p):
+    """Sayap melengkung mengikuti punggung: makin jauh dari tulang belakang, makin maju membungkus sisi badan.
+    Dari samping sayap jadi punya volume, bukan bidang tipis."""
+    ax = abs(p[0])
+    return [p[0], p[1], p[2] + 0.13 * max(0.0, (ax - 0.07) / 0.22) ** 1.6]
+
+
+def feather(root, tip, width, out, ragged=False, seg=12, twist=0.0):
     """Helai bulu dari root ke tip. out = arah ke luar permukaan (menjauhi badan).
     Return (verts, norms, idx, material, colors). Warna vertex = gradasi terang-gelap (bukan warna akhir: warna
     dari pewarna part `feather` di runtime, gradasi ini masuk ke shade level lewat `albedo` bake):
     pangkal gelap, tengah terang, ujung meredup, tulang bulu lebih terang, belang serat tipis, tiap helai beda nada.
     Tepi helai melengkung ke arah badan (cekung) supaya cahaya jatuh berbeda di kiri-kanan tulang bulu."""
+    root, tip = bend(root), bend(tip)
     d = [tip[k] - root[k] for k in range(3)]
     side = norm(cross(d, out))
+    # Miring seperti genteng: tepi luar helai terangkat, jadi tiap helai punya sisi terang dan bayangan sendiri.
+    tc, ts = math.cos(math.radians(twist)), math.sin(math.radians(twist))
     tone = random.uniform(0.6, 1.05)
     verts, cols, idx = [], [], []
     for i in range(seg + 1):
@@ -46,7 +56,7 @@ def feather(root, tip, width, out, ragged=False, seg=12):
         stripe = 0.12 if i % 2 else -0.1
         for s in (-1, 0, 1):
             cup = -0.012 * (w / width) if s else lift
-            p = [c[k] + side[k] * w * s + out[k] * cup for k in range(3)]
+            p = [c[k] + side[k] * w * s * tc + out[k] * (cup + w * s * ts) for k in range(3)]
             verts.append(p)
             v = max(0.08, min(1.0, tone * (along + stripe) * (1.2 if s == 0 else 0.75)))
             cols.append([v, v, v, 1.0])
@@ -91,37 +101,39 @@ def wing(s):
     W = X([0.26, 1.68, -0.25])  # pergelangan menyembul di atas bahu
     H = X([0.24, 1.52, -0.27])  # ujung tulang tangan
     out = [0, 0, -1]  # permukaan luar menghadap belakang
+    S, E, W, H = (bend(p) for p in (S, E, W, H))
     parts = [(*bone(S, E, 0.022), 'Bone'), (*bone(E, W, 0.018), 'Bone'), (*bone(W, H, 0.015), 'Bone')]
+    tw = 24 * s
     # Primer: dari tangan (W→H) jatuh ke betis, sedikit melebar ke luar di bawah.
     for i in range(14):
         t = i / 13
         r = lerp3(W, H, t)
-        r[2] += 0.003 * i
+        r[2] += 0.02 + 0.003 * i  # primer paling dalam
         length = random.uniform(1.1, 1.22) - 0.15 * t
         tip = [r[0] + s * (-0.02 + 0.04 * t), r[1] - length, r[2] - 0.03 + 0.02 * t]
-        parts.append(feather(r, tip, 0.06, out, ragged=random.random() < 0.4))
+        parts.append(feather(r, tip, 0.06, out, ragged=random.random() < 0.4, twist=tw))
     # Sekunder: dari lengan bawah (E→W), lebih pendek, menutupi pangkal primer.
     for i in range(14):
         t = i / 13
         r = lerp3(E, W, t)
-        r[2] -= 0.02
+        r[2] -= 0.035
         length = random.uniform(0.62, 0.75) * (0.8 + 0.35 * t)
         tip = [r[0] - s * 0.05 * (1 - t), r[1] - length, r[2] - 0.03]
-        parts.append(feather(r, tip, 0.065, out, ragged=random.random() < 0.35))
+        parts.append(feather(r, tip, 0.065, out, ragged=random.random() < 0.35, twist=tw))
     # Bulu penutup: dua baris pendek di atas, paling luar.
-    for row, (ln, dz) in enumerate(((0.26, -0.04), (0.15, -0.055))):
+    for row, (ln, dz) in enumerate(((0.26, -0.07), (0.15, -0.095))):
         for i in range(11):
             t = i / 10
             r = lerp3(S, W, t) if row else lerp3(E, W, t)
             r = [r[0], r[1] + 0.02, r[2] + dz]
             tip = [r[0], r[1] - ln * random.uniform(0.85, 1.1), r[2] - 0.015]
-            parts.append(feather(r, tip, 0.05, out))
+            parts.append(feather(r, tip, 0.05, out, twist=tw))
     # Bulu bahu (skapular) dari S ke E.
     for i in range(6):
         r = lerp3(S, E, i / 5)
-        r[2] -= 0.03
+        r[2] -= 0.05
         tip = [r[0], r[1] - 0.32, r[2] - 0.02]
-        parts.append(feather(r, tip, 0.05, out))
+        parts.append(feather(r, tip, 0.05, out, twist=tw))
     return parts
 
 
