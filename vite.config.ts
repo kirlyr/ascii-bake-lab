@@ -34,8 +34,8 @@ export default defineConfig({
   plugins: [bakeSave()],
   build: {
     target: 'es2022',
-    // Hanya player yang di-build. bake.html (Three.js) khusus dev server.
-    rolldownOptions: { input: { main: resolve('index.html') } },
+    // Hanya player (Tavern) + home yang di-build. bake.html (Three.js) khusus dev server.
+    rolldownOptions: { input: { main: resolve('index.html'), home: resolve('home.html') } },
   },
   optimizeDeps: { entries: ['index.html', 'bake.html'] },
   assetsInclude: ['**/*.glb'],

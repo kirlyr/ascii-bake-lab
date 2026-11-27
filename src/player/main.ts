@@ -1,9 +1,10 @@
 // Player produksi: memutar hasil bake (.bake) sebagai teks di canvas. Tanpa Three.js.
 import { loadBake, type BakeFile, type TurnFile } from '../shared/format';
-import { activeLayers, composeFrame, createGrid, decodeSprite, defaultEquipment, type Sprite } from '../shared/compose';
+import { activeLayers, composeFrame, createGrid, decodeSprite, type Sprite } from '../shared/compose';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
 import { AURAS, RUNES, RuneEmitter, alongBlade, alongEdge, type AuraKey, type RuneKey, type Spawn } from '../shared/runes';
-import { BLADE_MATERIALS, DYEABLE, MATERIALS, lookFor, type MaterialKey } from '../shared/materials';
+import { BLADE_MATERIALS, DYEABLE, MATERIALS, type MaterialKey } from '../shared/materials';
+import { loadLoadout, materialsFor, saveLoadout } from '../shared/loadout';
 
 const MODEL = new URLSearchParams(location.search).get('model') ?? 'hero';
 const URL_BAKE = `${import.meta.env.BASE_URL}baked/${MODEL}.bake`;
@@ -30,14 +31,16 @@ view.resize(cols, file.rows);
 const SIDE = file.facing === 'right' ? -90 : 90;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Kustomisasi di sini (Tavern) disimpan sebagai loadout, Home memakai loadout yang sama.
+const lo = loadLoadout(file);
+const save = () => saveLoadout(lo);
 const state = {
   clip: 'idle',
   /** arah kamera (derajat, kelipatan 22,5). -90 = hadap kanan, 90 = hadap kiri, 0 = depan. */
   yaw: SIDE,
   mode: 'material' as ColorMode,
-  blade: 'iron' as MaterialKey,
   sockets: false,
-  equip: defaultEquipment(file),
+  equip: lo.equip,
   playing: !reducedMotion,
   rune: null as RuneEmitter | null,
   /** aura per slot; partikel lahir di tepi silhouette item yang dipasang di slot itu. */
@@ -61,12 +64,24 @@ for (const slot of Object.keys(state.equip)) {
   const aura = reducedMotion ? '' : `<select data-aura="${slot}" aria-label="Aura ${name}">${auraOptions}</select>`;
   equipEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${name} ${aura}</span><div class="row" role="group" aria-label="${name}">${buttons}</div>`);
 }
+function setAura(slot: string, aura: AuraKey | null) {
+  if (aura) state.auras[slot] = new RuneEmitter(AURAS[aura]);
+  else delete state.auras[slot];
+  if (aura) lo.auras[slot] = aura;
+  else delete lo.auras[slot];
+}
+if (!reducedMotion) {
+  for (const [slot, aura] of Object.entries(lo.auras)) {
+    setAura(slot, aura);
+    equipEl.querySelector<HTMLSelectElement>(`select[data-aura="${slot}"]`)!.value = aura;
+  }
+}
 equipEl.addEventListener('change', (e) => {
   const sel = (e.target as HTMLElement).closest<HTMLSelectElement>('select[data-aura]');
   if (!sel) return;
   const slot = sel.dataset.aura!;
-  if (sel.value) state.auras[slot] = new RuneEmitter(AURAS[sel.value as AuraKey]);
-  else delete state.auras[slot];
+  setAura(slot, (sel.value || null) as AuraKey | null);
+  save();
   draw();
 });
 equipEl.addEventListener('click', (e) => {
@@ -74,23 +89,20 @@ equipEl.addEventListener('click', (e) => {
   if (!b) return;
   const slot = b.dataset.slot!;
   state.equip[slot] = b.dataset.layer || null;
+  save();
   equipEl.querySelectorAll<HTMLButtonElement>(`[data-slot="${slot}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   draw();
 });
 
 // Material blade: ganti tabel glyph/warna part "blade" saja, tanpa re-bake.
 // Pewarna: part → key palet. Sama seperti material blade, hanya tabel warna yang dibangun ulang.
-const dye: Record<string, string> = Object.fromEntries(Object.entries(DYEABLE).map(([p, d]) => [p, d.initial]));
-const applyLook = () => {
-  const dyes = Object.fromEntries(Object.entries(dye).map(([p, k]) => [p, DYEABLE[p].palette[k]]));
-  view.setLook({ parts: file.parts, ramp: file.ramp, materials: lookFor(file.parts, { ...dyes, blade: state.blade }) });
-};
+const applyLook = () => view.setLook({ parts: file.parts, ramp: file.ramp, materials: materialsFor(file, lo) });
 applyLook();
 const dyeEl = $<HTMLElement>('#dye');
 for (const [part, d] of Object.entries(DYEABLE)) {
   if (!file.parts.includes(part)) continue;
   const swatches = Object.entries(d.palette)
-    .map(([k, m]) => `<button class="swatch" data-dye="${part}" data-key="${k}" aria-pressed="${k === d.initial}" aria-label="${d.label}: ${m.label}" title="${m.label}" style="--c:${m.colors[1]}"></button>`)
+    .map(([k, m]) => `<button class="swatch" data-dye="${part}" data-key="${k}" aria-pressed="${k === lo.dye[part]}" aria-label="${d.label}: ${m.label}" title="${m.label}" style="--c:${m.colors[1]}"></button>`)
     .join('');
   dyeEl.insertAdjacentHTML('beforeend', `<span class="slot-name">${d.label}</span><div class="row" role="group" aria-label="Warna ${d.label}">${swatches}</div>`);
 }
@@ -98,14 +110,15 @@ dyeEl.addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-dye]');
   if (!b) return;
   const part = b.dataset.dye!;
-  dye[part] = b.dataset.key!;
+  lo.dye[part] = b.dataset.key!;
+  save();
   dyeEl.querySelectorAll<HTMLButtonElement>(`[data-dye="${part}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   applyLook();
   paint();
 });
 const bladeEl = $<HTMLElement>('#blade');
 if (file.parts.includes('blade')) {
-  for (const k of BLADE_MATERIALS) bladeEl.insertAdjacentHTML('beforeend', `<button data-blade="${k}" aria-pressed="${k === state.blade}">${MATERIALS[k].label}</button>`);
+  for (const k of BLADE_MATERIALS) bladeEl.insertAdjacentHTML('beforeend', `<button data-blade="${k}" aria-pressed="${k === lo.blade}">${MATERIALS[k].label}</button>`);
 } else {
   bladeEl.innerHTML = '<span class="muted">Model ini tanpa blade.</span>';
 }
@@ -130,13 +143,16 @@ const setClip = bindGroup('clip', (v) => {
 });
 const setDir = bindGroup('dir', (v) => setYaw(v === file.facing ? SIDE : -SIDE));
 bindGroup('mode', (v) => (state.mode = v as ColorMode));
-bindGroup('rune', (v) => {
+const setRune = bindGroup('rune', (v) => {
+  lo.rune = v === 'none' ? null : (v as RuneKey);
+  save();
   // Partikel = animasi, jadi mati total saat reduced-motion.
   state.rune = v === 'none' || reducedMotion ? null : new RuneEmitter(RUNES[v as RuneKey]);
   $<HTMLElement>('#rune-note').hidden = !(reducedMotion && v !== 'none');
 });
 bindGroup('blade', (v) => {
-  state.blade = v as MaterialKey;
+  lo.blade = v as MaterialKey;
+  save();
   applyLook();
 });
 
@@ -246,6 +262,7 @@ function tick(now: number) {
   }
   requestAnimationFrame(tick);
 }
+if (lo.rune) setRune(lo.rune);
 draw();
 requestAnimationFrame(tick);
 

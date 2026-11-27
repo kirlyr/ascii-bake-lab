@@ -41,6 +41,8 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   butuh pack Quaternius berbayar (diunduh user dari laptop). Tombak/kapak dua tangan belum punya pose sendiri.
 - Pewarna per part (kain, kulit, linen, wol, pelat, helm, hiasan) + format biner `.bake` (gzip, plane cell/depth):
   hero.bake 195 KB, hero-turn.bake 195 KB (dari 280/270 KB JSON gzip). JSON tidak lagi di-commit. (2026-11-27)
+- Loadout (2026-11-27, user minta): kustomisasi di Tavern disimpan di localStorage pengunjung dan otomatis dipakai
+  Home (`src/shared/loadout.ts`, prototype `/home.html`, hanya `hero.bake`).
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
@@ -57,5 +59,5 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Repo private, tetap jangan simpan data pribadi (nomor telepon, alamat, dsb.) di repo.
 
 ## Perintah
-- `npm run dev` → player di `/`, bake tool di `/bake.html`
-- `npm run build` → type check + build player saja
+- `npm run dev` → player/Tavern di `/`, Home di `/home.html`, bake tool di `/bake.html`
+- `npm run build` → type check + build player + home saja

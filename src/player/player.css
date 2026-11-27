@@ -24,3 +24,4 @@ select { background:var(--bg); color:var(--muted); border:1px solid var(--border
 select:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
 .swatch { width:20px; height:20px; padding:0; background:var(--c); border:2px solid var(--border); }
 .swatch[aria-pressed="true"] { border-color:var(--gold); outline:1px solid var(--gold); outline-offset:1px; }
+a { color:var(--gold); }

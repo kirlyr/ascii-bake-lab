@@ -18,7 +18,7 @@ npm run dev
 - `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), equipment per slot, aura per slot, putar 16 arah,
   material blade (Iron/Steel/Gold/Bloodiron), rune api, mode warna Material/Part/Depth, penanda socket blade.
   Tahan ← / → untuk berjalan.
-- `npm run build` hanya mem-build player. Hasil saat ini: JS 11,5 KB (5,3 KB gzip), Three.js tidak ikut.
+- `npm run build` hanya mem-build player + `home.html`. Three.js tidak ikut.
 
 ## Cara kerja bake
 
@@ -103,6 +103,16 @@ sel kosong atau layer lain), bukan di socket blade. Compose kini mencatat layer 
 `edgeCells()` mengambil tepinya tiap frame. Tanpa bake ulang dan tanpa menambah ukuran file. Per slot bisa dipilih
 satu aura: Bara, Suci, Es, Bayangan, Racun (`AURAS` di `runes.ts`). Mati total saat `prefers-reduced-motion`.
 
+## Loadout (Tavern → Home)
+
+Semua pilihan di player (equipment, pewarna, material blade, aura, rune) disimpan sebagai loadout di `localStorage`
+pengunjung (`src/shared/loadout.ts`, key `ascii-hero-loadout`) dan langsung dipulihkan saat halaman dibuka lagi.
+`/home.html` (prototype Home) hanya memuat `hero.bake`, sudut samping, idle, tanpa kontrol, dan memakai loadout yang
+sama. Jadi player = Tavern = tempat kustomisasi karakter Home. Nilai yang tidak dikenal lagi (layer dihapus, palet
+diganti) jatuh ke default bake. Tiap pengunjung punya loadout sendiri; tanpa loadout tersimpan = susunan default.
+
+![home dengan loadout](docs/media/home-loadout.png)
+
 ## Memutar karakter (16 arah, idle napas)
 
 Preset `hero-turn` (`/bake.html?model=hero-turn`) mem-bake **4 frame idle** (merata sepanjang clip, `stillFrames: 4`) dari 9 arah (`views`: 0°, −22,5° … −180°),
@@ -174,7 +184,8 @@ Ruang optimasi lain yang belum dikerjakan: fps 8–10, file per layer (lazy).
 ```
 bake.html, src/bake/        bake tool (Three.js, dev only)
 index.html, src/player/     player (produksi)
-src/shared/                 format JSON, compose, renderer canvas (tanpa Three.js)
+home.html, src/home/        prototype Home: karakter dengan loadout dari Tavern
+src/shared/                 format .bake, compose, loadout, renderer canvas (tanpa Three.js)
 public/baked/*.bake         hasil bake (container biner gzip)
 assets/models/quaternius*/  model CC0 + SOURCE.md
 docs/PLAN.md                rencana portfolio lengkap
