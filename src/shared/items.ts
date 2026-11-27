@@ -70,6 +70,7 @@ export const ITEMS: Record<string, ItemText> = {
   dagger: { name: 'Dagger', kind: 'weapon · one-handed', desc: 'Short, quiet and always within reach. The last friend in a crowded alley.' },
   axe_double: { name: 'Double Axe', kind: 'weapon · heavy', desc: 'Two crescent blades on a long haft. Swing it once and the room makes space.' },
   hammer_small: { name: 'Smith Hammer', kind: 'weapon · one-handed', desc: 'Borrowed from the tavern forge and never returned. Fixes armour, and dents it too.' },
+  flail: { name: 'Flail', kind: 'weapon · one-handed', desc: 'A spiked iron ball on a short chain. It swings where it likes, so stand clear of the wielder.' },
   shield_heater: { name: 'Heater Shield', kind: 'off-hand · oak & iron', desc: 'Oak planks under an iron rim, shaped like an old flat-iron. The knight standard for a reason.' },
   shield_heater_2: { name: 'Banded Heater', kind: 'off-hand · oak & iron', desc: 'A heater shield with an extra iron band across the middle. Heavier, and it has stopped heavier things.' },
   shield_round: { name: 'Round Shield', kind: 'off-hand · oak & iron', desc: 'A wide circle of oak with an iron boss. Easy to make, easy to replace, hard to get past.' },

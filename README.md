@@ -72,7 +72,7 @@ dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
 | Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`), Halo (buatan sendiri) | helmet, trim, gem |
 | Punggung | Jubah, Fallen Wings, Angel Wings, Broken Wings (semua buatan sendiri) | cloak, feather, plume, wood |
 | Janggut | Janggut, Janggut Panjang (helai panjang disimulasikan sebagai kain) | hair |
-| Senjata | Pedang, Pedang Pendek, Katana, Gada (Knight Pack); Kapak, Tombak, Palu Perang, Sabit Maut, Claymore, Pedang Besar, Pedang Emas, Belati, Kapak Ganda, Palu Kecil (Modular Weapons Pack) | blade, hilt, wood |
+| Senjata | Pedang, Pedang Pendek, Katana, Gada (Knight Pack); Kapak, Tombak, Palu Perang, Sabit Maut, Claymore, Pedang Besar, Pedang Emas, Belati, Kapak Ganda, Palu Kecil (Modular Weapons Pack); Flail (buatan sendiri) | blade, hilt, wood |
 | Off-hand | Perisai Heater, Heater 2, Bundar, Bundar 2, Kelt (Modular Weapons Pack), di lengan bawah kiri, kosong di susunan bawaan | armor, wood, trim |
 
 Outfit Ranger dan Peasant memang terdiri dari mesh terpisah per bagian, jadi bisa dipecah ke slot dan di-mix tanpa aset
@@ -180,6 +180,11 @@ Satu karakter proporsi realistis (bukan chibi), tinggi 90 baris. Semua aset **CC
 | Jubah | buatan sendiri, prosedural (`make_cloak.py`), disimulasikan sebagai kain saat bake (`src/bake/cloth.ts`) | `assets/models/cloak/` |
 | Sayap bulu (terlipat) | buatan sendiri, prosedural (`make_wings.py`) | `assets/models/wings/` |
 | Pelat kaki + sepatu besi | buatan sendiri, prosedural (`make_greaves.py`) | `assets/models/greaves/` |
+| Sayap malaikat terbuka + sayap rusak | buatan sendiri, prosedural (`make_wings.py`) | `assets/models/wings/` |
+| Halo + janggut panjang | buatan sendiri, prosedural (`make_accessories.py`), janggut disimulasikan sebagai kain | `assets/models/accessories/` |
+| Zirah ramping | buatan sendiri, prosedural (`make_cuirass.py`) | `assets/models/cuirass/` |
+| Robe + robe compang-camping | buatan sendiri, prosedural (`make_robe.py`), rok kain tabung (`wrap`, `axis: pelvis`) | `assets/models/robe/` |
+| Flail | buatan sendiri, prosedural (`make_flail.py`), rantai disimulasikan Verlet saat bake (`src/bake/flail.ts`) | `assets/models/flail/` |
 
 Sumber unduhan dan catatan lisensi ada di `SOURCE.md` tiap folder (diambil dari mirror GitHub karena situs Quaternius
 tidak bisa diakses dari cloud). Versi gratis Modular Outfits hanya berisi Ranger dan Peasant; outfit armor penuh ada di
@@ -202,8 +207,8 @@ Perbaikan karakter (PR #5):
 | | |
 |---|---|
 | Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
-| `hero.bake` | 58 layer × 2 clip = **508 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
-| `hero-turn.bake` | 16 arah × 58 layer × 4 frame = **879 KB** (grid 162 kolom: sayap malaikat) (22 layer: 342 KB) |
+| `hero.bake` | 59 layer × 2 clip = **516 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
+| `hero-turn.bake` | 16 arah × 59 layer × 4 frame = **890 KB** (grid 162 kolom: sayap malaikat) (22 layer: 342 KB) |
 | Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
 
 Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan

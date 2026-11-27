@@ -59,7 +59,7 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   rusak (`make_wings.py`), halo (part `trim`) + janggut panjang (kain disimulasikan, `make_accessories.py`), zirah
   ramping (`make_cuirass.py`), robe + robe compang-camping (rok kain tabung `wrap`, dorongan radial `axis: pelvis`,
   `make_robe.py`), pelat kaki/sepatu ramping (`make_greaves.py`). Format sel penuh: 16 part (jangan tambah part).
-  Panggung Tavern memotong sisi kanvas, bukan mengecilkan karakter (grid putar 162 kolom). Berikutnya: flail.
+  Panggung Tavern memotong sisi kanvas, bukan mengecilkan karakter (grid putar 162 kolom). Batch 5: flail buatan sendiri (`make_flail.py`), rantai = tali Verlet saat bake (`src/bake/flail.ts`); berayun saat idle/jalan, tapi tidak bisa terseret saat diputar (putar = arah ter-bake).
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)

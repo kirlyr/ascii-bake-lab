@@ -6,6 +6,7 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { b64encode, EMPTY_DEPTH, MAX_PARTS, MAX_SHADES, packCell, type BakeFile, type BladeSocket, type FrameData, type SocketPoint } from '../shared/format';
 import { buildGlyphSet, makeMatcher, DIMS, REG_X, REG_Y } from './glyphs';
 import { Cloth, type ClothSpec } from './cloth';
+import { Flail, type FlailSpec } from './flail';
 
 export interface LayerDef {
   label: string;
@@ -120,6 +121,8 @@ export interface BakeParams {
   attachments?: Attachment[];
   /** mesh kain yang disimulasikan saat bake (lihat cloth.ts). */
   cloth?: ClothSpec[];
+  /** rantai flail yang disimulasikan saat bake (lihat flail.ts). */
+  flails?: FlailSpec[];
   /**
    * Outfit skinned dengan rig yang sama (mis. Quaternius Modular Outfits di atas Universal Base Characters).
    * Mesh-nya di-bind ulang ke skeleton model utama, jadi ikut animasi yang sama.
@@ -250,6 +253,19 @@ export const DEFAULT_PARAMS: BakeParams = {
     },
   ],
 
+  // Flail: rantai 9 mata + bola berduri, digantung dari ujung gagang. Kapsul = kaki kanan (bola membentur betis).
+  flails: [
+    {
+      name: 'flail',
+      links: 9,
+      wind: { walk: 1.3 },
+      colliders: [
+        { from: 'thigh_r', to: 'calf_r', radius: 0.11 },
+        { from: 'calf_r', to: 'foot_r', radius: 0.08 },
+      ],
+    },
+  ],
+
   // Rambut + janggut Universal Base Characters (sudah di-rig ke skeleton yang sama).
   outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`, ...['SimpleParted', 'Buzzed', 'Long', 'Beard'].map((h) => `${UBC}/Hair_${h}.gltf`)],
   outfitInflate: 0.02,
@@ -272,6 +288,8 @@ export const DEFAULT_PARAMS: BakeParams = {
     { ...weapon('dagger', `${W}/Dagger.glb`), scale: 0.18, grip: -0.0008 },
     { ...weapon('axe_double', `${W}/Axe_Double.glb`, 90), scale: 0.18, grip: -0.02 },
     { ...weapon('hammer_small', `${W}/Hammer_Small.glb`), scale: 0.18 },
+    // Flail buatan sendiri (assets/models/flail/make_flail.py), konvensi node sama dengan pack Quaternius.
+    { ...weapon('flail', '/assets/models/flail/Flail.glb'), scale: 0.18 },
     // Perisai di lengan bawah kiri, muka menghadap ke luar badan.
     ...['Heater', 'Heater_2', 'Round', 'Round_2', 'Celtic_Golden'].map((f) => shield(`shield_${f.toLowerCase()}`, `${W}/Shield_${f}.glb`)),
     // Mahkota duduk di atas rambut, lebih besar dan lebih tinggi: pita setinggi 2 baris hanya jadi glyph tepi di ASCII.
@@ -461,6 +479,13 @@ export const DEFAULT_PARAMS: BakeParams = {
       parts: { blade: ['hammer_small:Steel', 'hammer_small:LightSteel'], wood: ['hammer_small:DarkWood', 'hammer_small:LightWood'] },
       blade: { mesh: 'hammer_small:Steel', axis: 'z', at: 0.012, below: 'hilt', above: 'blade' },
     },
+    // Flail: gagang kayu (socket rune di sepanjang gagang atas), rantai + bola ikut forge.
+    flail: {
+      label: 'Flail',
+      slot: 'weapon',
+      parts: { blade: ['flail:Steel', 'flail:Chain', 'flail:Ball'], wood: ['flail:Wood'], hilt: ['flail:Leather'] },
+      blade: { mesh: 'flail:Wood', axis: 'z', at: 0.004, below: 'wood', above: 'wood' },
+    },
     // Perisai (slot Off-hand): kosong di susunan bawaan. Logam = pelat (bisa diwarnai Plate), kayu = kayu.
     shield_heater: {
       label: 'Perisai Heater',
@@ -578,7 +603,8 @@ export interface BakeContext {
   mixer: THREE.AnimationMixer;
   animations: THREE.AnimationClip[];
   meshes: Map<string, THREE.Object3D>;
-  cloth: Cloth[];
+  /** simulasi saat bake (kain, rantai flail): dipanggil tiap pose dengan clip + waktu. */
+  cloth: (Cloth | Flail)[];
 }
 
 const loadAny = async (url: string): Promise<{ scene: THREE.Object3D; animations: THREE.AnimationClip[] }> => {
@@ -722,7 +748,7 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     cloth: [],
   };
   root.updateMatrixWorld(true);
-  ctx.cloth = (p.cloth ?? []).map((c) => new Cloth(ctx, c));
+  ctx.cloth = [...(p.cloth ?? []).map((c) => new Cloth(ctx, c)), ...(p.flails ?? []).map((f) => new Flail(ctx, f))];
   return ctx;
 }
 
