@@ -98,7 +98,7 @@ for (const [a, b] of PAIRS) {
 }
 export const mirrorChar = (c: string): string => MIRROR_MAP[c] ?? c;
 
-/** Hasil bake banyak arah (pose diam untuk memutar karakter). Arah lain = mirror dari salah satu view. */
+/** Hasil bake banyak arah (idle napas beberapa frame, untuk memutar karakter). Arah lain = mirror dari salah satu view. */
 export interface TurnFile {
   views: BakeFile[];
 }
