@@ -58,6 +58,11 @@ export interface LayerData {
    * asal selisihnya ≤ bias. Untuk armor yang ditembus badan (mesh badan sedikit lebih besar dari outfit).
    */
   bias?: number;
+  /**
+   * Prioritas tambahan (unit depth) terhadap layer di slot tertentu saja, mis. jubah vs rompi yang menembus
+   * punggung jauh lebih dalam dari bias biasa, tanpa ikut menimpa lengan (badan).
+   */
+  over?: Record<string, number>;
   /** nama clip → frame berurutan (loop). */
   clips: Record<string, FrameData[]>;
 }
