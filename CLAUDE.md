@@ -67,6 +67,9 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   (`make_mantle.py`), chainmail (salinan tunik Peasant lewat `copies`, pola cincin di shader bake), busur Quaternius +
   tabung panah (`make_quiver.py`). Opsi lain yang ditawarkan tapi belum dibuat: helm bertanduk, mahkota duri, topeng
   tengkorak/plague doctor, pauldron berduri/tulang, gambeson, zirah tulang, pedang besar di punggung, sayap kelelawar, panji.
+- Perbaikan 2026-11-28 sore (user minta): partikel rune/aura punya depth saat lahir dan tidak digambar di belakang sel
+  yang lebih dekat (efek senjata tidak tembus badan saat diputar ke belakang), Rambut Buzzed `bias: 0.01` (depth 1 cm per
+  unit, rambut tipis kalah seri dari kulit kepala), tulang Broken Wings pakai part `plume` (putih tulang, bukan kayu).
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)

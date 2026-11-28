@@ -383,7 +383,7 @@ export const DEFAULT_PARAMS: BakeParams = {
     body: { label: 'Badan', parts: { skin: ['SuperHero_Male', 'Eyes'], hair: ['Eyebrows'] } },
     // Rambut: varian pertama = bawaan (hitam lewat pewarna `hair`). Slot bisa dikosongkan (botak / tanpa janggut).
     hair_parted: { label: 'Rambut Belah', slot: 'hair', parts: { hair: ['Hair_SimpleParted'] } },
-    hair_buzzed: { label: 'Rambut Cepak', slot: 'hair', parts: { hair: ['Hair_Buzzed'] } },
+    hair_buzzed: { label: 'Rambut Cepak', slot: 'hair', bias: 0.01, parts: { hair: ['Hair_Buzzed'] } },
     hair_long: { label: 'Rambut Panjang', slot: 'hair', parts: { hair: ['Hair_Long'] } },
     beard: { label: 'Janggut', slot: 'beard', parts: { hair: ['Hair_Beard'] } },
     // Janggut panjang: janggut UBC (kumis + rahang) + helai panjang yang disimulasikan sebagai kain (lihat `cloth`).
@@ -437,7 +437,7 @@ export const DEFAULT_PARAMS: BakeParams = {
     wings: { label: 'Fallen Wings', slot: 'back', bias: 0.02, parts: { feather: ['wings:Feather', 'wings:Bone'] } },
     // Sayap malaikat memakai part `plume` (bawaan putih) supaya tidak ikut pewarna sayap gelap.
     wings_angel: { label: 'Angel Wings', slot: 'back', bias: 0.02, parts: { plume: ['wings_angel:Feather', 'wings_angel:Bone'] } },
-    wings_broken: { label: 'Broken Wings', slot: 'back', bias: 0.02, parts: { feather: ['wings_broken:Feather'], wood: ['wings_broken:Bone'] } },
+    wings_broken: { label: 'Broken Wings', slot: 'back', bias: 0.02, parts: { feather: ['wings_broken:Feather'], plume: ['wings_broken:Bone'] } },
     // Varian per slot = layer terpisah. Ukuran file = jumlah layer, bukan kombinasi.
     helmet1: { bias: 0.02, hides: ['hair'], label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
     helmet2: { bias: 0.02, hides: ['hair'], label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },

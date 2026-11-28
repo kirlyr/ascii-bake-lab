@@ -125,15 +125,16 @@ export const AURAS = {
 
 export type AuraKey = keyof typeof AURAS;
 
-/** Titik spawn partikel di koordinat grid (unit sel), atau null = berhenti spawn. */
-export type Spawn = (() => [number, number]) | null;
+/** Titik spawn partikel [x, y, depth] di koordinat grid (unit sel, depth = unit depth grid), atau null = berhenti spawn. */
+export type Spawn = (() => [number, number, number]) | null;
 
 /** Spawn acak di sepanjang socket blade. */
 export const alongBlade = (blade: BladeSocket | null): Spawn =>
   blade &&
   (() => {
     const t = Math.random();
-    return [blade.base[0] + (blade.tip[0] - blade.base[0]) * t, blade.base[1] + (blade.tip[1] - blade.base[1]) * t];
+    const at = (k: number) => blade.base[k] + (blade.tip[k] - blade.base[k]) * t;
+    return [at(0), at(1), at(2)];
   });
 
 /** Part id dari `fx` layer (part yang memancarkan efek), atau undefined = seluruh layer. */
@@ -154,7 +155,7 @@ export function alongEdge(grid: Grid, layer: string, parts?: number[]): Spawn {
   if (!edge.length) return null;
   return () => {
     const i = edge[Math.floor(Math.random() * edge.length)];
-    return [(i % grid.cols) + Math.random(), Math.floor(i / grid.cols) + Math.random()];
+    return [(i % grid.cols) + Math.random(), Math.floor(i / grid.cols) + Math.random(), grid.depth[i]];
   };
 }
 
@@ -163,6 +164,8 @@ interface Particle {
   y: number;
   vx: number;
   vy: number;
+  /** depth saat lahir: partikel tertutup sel yang lebih dekat (badan di depan senjata) tidak digambar. */
+  z: number;
   age: number;
   life: number;
   /** partikel besar: glyph 2× tanpa snap ke sel, kesan percikan yang lebih mewah. */
@@ -181,6 +184,8 @@ const LEVEL = {
 
 const parse = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const MAX_PARTICLES = 1200;
+/** Toleransi oklusi (unit depth, ±1 cm per unit): partikel di tepi item tidak tertutup item itu sendiri. */
+const OCCLUDE = 3;
 
 /** Sprite halo (gradien radial warna glow), digambar sekali lalu di-drawImage per partikel: murah. */
 function haloSprite(color: string) {
@@ -234,12 +239,13 @@ export class RuneEmitter {
     this.carry += r.rate * lv.rate * dt;
     while (this.carry >= 1 && this.ps.length < MAX_PARTICLES) {
       this.carry--;
-      const [x, y] = spawn();
+      const [x, y, z] = spawn();
       const big = Math.random() < lv.big;
       const j = r.jitter * lv.spread;
       this.ps.push({
         x,
         y,
+        z,
         vx: r.vel[0] + (Math.random() * 2 - 1) * j,
         vy: (r.vel[1] + (Math.random() * 2 - 1) * j) * (big ? 0.7 : 1),
         age: 0,
@@ -258,13 +264,19 @@ export class RuneEmitter {
     const { cols, rows } = grid;
     if (!this.ps.length) return;
     const r = this.rune;
+    // Oklusi: partikel di belakang sel yang lebih dekat (mis. senjata di sisi badan yang jauh) disembunyikan.
+    const ps = this.ps.filter((p) => {
+      const cx = Math.floor(p.x);
+      const cy = Math.floor(p.y);
+      return cx < 0 || cy < 0 || cx >= cols || cy >= rows || grid.depth[cy * cols + cx] + OCCLUDE >= p.z;
+    });
     const font = ctx.font;
     const fontPx = cellW / 0.6;
     ctx.save();
     // 1. kosongkan sel di bawah glyph kecil dulu, supaya halo yang menyusul ikut menerangi sel itu (tanpa kotak gelap).
     ctx.fillStyle = background;
     const cells: [number, number, Particle][] = [];
-    for (const p of this.ps) {
+    for (const p of ps) {
       if (p.big) continue;
       const cx = Math.floor(p.x);
       const cy = Math.floor(p.y);
@@ -275,7 +287,7 @@ export class RuneEmitter {
     // 2. halo (bloom)
     ctx.globalCompositeOperation = 'lighter';
     const hs = cellW * 5 * this.lv.halo;
-    for (const p of this.ps) {
+    for (const p of ps) {
       const k = p.age / p.life;
       // dibagi akar jumlah partikel supaya level tinggi tidak jadi gumpalan putih (blend 'lighter' cepat jenuh).
       ctx.globalAlpha = ((1 - k) * (p.big ? 0.32 : 0.11) * Math.min(1.2, this.lv.halo)) / Math.sqrt(this.lv.rate);
@@ -295,7 +307,7 @@ export class RuneEmitter {
     // 4. glyph besar
     ctx.font = `700 ${Math.round(fontPx * 2)}px "JetBrains Mono", monospace`;
     ctx.shadowBlur = 14;
-    for (const p of this.ps) {
+    for (const p of ps) {
       if (!p.big) continue;
       const k = p.age / p.life;
       ctx.fillStyle = this.styles[Math.min(7, Math.floor(k * 8))];
