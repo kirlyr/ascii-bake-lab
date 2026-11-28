@@ -25,6 +25,8 @@ export interface LayerDef {
   blade?: BladeSplit;
   /** meter. Layer ini menang atas layer yang lebih dekat ≤ jarak ini (lihat LayerData.bias). */
   bias?: number;
+  /** meter. Bias tambahan hanya terhadap layer di slot ini (lihat LayerData.over). */
+  over?: Record<string, number>;
   /** part → mesh. Part menentukan material di runtime (lihat src/shared/materials.ts). */
   parts: Record<string, string[]>;
 }
@@ -144,6 +146,13 @@ export interface BakeParams {
    * fragment shader dari posisi bind (menempel di permukaan, tidak berenang saat animasi).
    */
   copies?: { from: string; name: string; inflate?: number; mail?: number }[];
+  /**
+   * Outfit dipas ke badan (pose rest): verteks outfit yang tenggelam di dalam `body` didorong keluar sepanjang
+   * normalnya sampai `margin` (m) di luar kulit, kalau kulitnya ≤ `reach` (m). Untuk badan Superhero yang jauh lebih
+   * besar dari outfit di punggung dan pundak (bias compose tidak cukup tanpa menimpa lengan). `spread` = iterasi
+   * perambatan dorongan ke verteks tetangga.
+   */
+  fit?: { meshes: string[]; body: string; margin: number; reach: number; spread: number };
   /** mesh yang selalu disembunyikan. */
   hidden: string[];
   /** ramp gelap → terang. Index glyph hasil shape matching = shade level. */
@@ -300,6 +309,7 @@ export const DEFAULT_PARAMS: BakeParams = {
   // Rambut + janggut Universal Base Characters (sudah di-rig ke skeleton yang sama).
   outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`, ...['SimpleParted', 'Buzzed', 'Long', 'Beard'].map((h) => `${UBC}/Hair_${h}.gltf`)],
   outfitInflate: 0.02,
+  fit: { meshes: ['Male_Ranger_Body'], body: 'SuperHero_Male', margin: 0.015, reach: 0.12, spread: 4 },
   // Chainmail = salinan tunik Peasant (panjang sampai paha, lengan panjang) dengan pola cincin rantai.
   copies: [
     { from: 'Male_Peasant_Body', name: 'mail:Body', inflate: 0.012, mail: 0.04 },
@@ -427,7 +437,8 @@ export const DEFAULT_PARAMS: BakeParams = {
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
     fur_mantle: { label: 'Mantel Bulu', slot: 'shoulder', bias: 0.05, parts: { wool: ['mantle:Fur'] } },
     // Bias sedikit di atas baju (0,04): jubah menempel di punggung. Lebih besar = jubah menutupi lengan dari samping.
-    cloak: { label: 'Cloak', slot: 'back', bias: 0.05, parts: { cloak: ['cloak:Cloth'] } },
+    // Rompi yang dipas ke badan Superhero menembus jubah di punggung atas; jubah menang atas slot torso saja.
+    cloak: { label: 'Cloak', slot: 'back', bias: 0.05, over: { torso: 0.15 }, parts: { cloak: ['cloak:Cloth'] } },
     quiver_bow: {
       label: 'Busur & Tabung Panah',
       slot: 'back',
@@ -746,6 +757,66 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
         for (let i = 0; i < pos.count; i++) pos.setXYZ(i, pos.getX(i) + nor.getX(i) * k, pos.getY(i) + nor.getY(i) * k, pos.getZ(i) + nor.getZ(i) * k);
       }
       meshes.set(m.name, m);
+    }
+  }
+
+  if (p.fit) {
+    const body = meshes.get(p.fit.body) as THREE.Mesh | undefined;
+    if (!body) throw new Error(`fit: mesh "${p.fit.body}" tidak ada`);
+    root.updateMatrixWorld(true);
+    // Raycast ke geometri rest badan (bukan hasil skinning), dua sisi supaya sinar dari dalam kulit kena.
+    const target = new THREE.Mesh(body.geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    target.matrixWorld.copy(body.matrixWorld);
+    target.matrixAutoUpdate = false;
+    const ray = new THREE.Raycaster();
+    ray.far = p.fit.reach;
+    const v = new THREE.Vector3();
+    const n = new THREE.Vector3();
+    for (const name of p.fit.meshes) {
+      const m = meshes.get(name) as THREE.Mesh | undefined;
+      if (!m) throw new Error(`fit: mesh "${name}" tidak ada`);
+      const g = (m.geometry = m.geometry.clone());
+      const pos = g.attributes.position, nor = g.attributes.normal;
+      const nm = new THREE.Matrix3().getNormalMatrix(m.matrixWorld);
+      const scale = m.matrixWorld.getMaxScaleOnAxis();
+      // Verteks kembar (seam UV) digabung per posisi supaya dorongannya sama dan permukaan tidak sobek.
+      const key = (i: number) => `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`;
+      const ids = new Map<string, number>();
+      const group = Array.from({ length: pos.count }, (_, i) => ids.get(key(i)) ?? (ids.set(key(i), ids.size), ids.size - 1));
+      const push = new Float32Array(ids.size);
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+        n.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize();
+        ray.set(v, n);
+        const hit = ray.intersectObject(target, false)[0];
+        // Hanya kalau sinar keluar dari dalam badan (normal permukaan searah sinar), bukan kena lengan dari luar.
+        if (!hit?.face || hit.face.normal.clone().transformDirection(body.matrixWorld).dot(n) <= 0) continue;
+        push[group[i]] = Math.max(push[group[i]], hit.distance + p.fit.margin);
+      }
+      // Dorongan dirambatkan ke tetangga (maks dengan rata-rata tetangga), supaya verteks di sela tidak tertinggal
+      // di bawah kulit dan membentuk duri.
+      const nb: number[][] = Array.from({ length: ids.size }, () => []);
+      const idx = g.index!;
+      for (let t = 0; t < idx.count; t += 3)
+        for (let e = 0; e < 3; e++) {
+          const a = group[idx.getX(t + e)], b = group[idx.getX(t + ((e + 1) % 3))];
+          nb[a].push(b);
+          nb[b].push(a);
+        }
+      for (let it = 0; it < p.fit.spread; it++) {
+        const prev = push.slice();
+        for (let gi = 0; gi < nb.length; gi++) {
+          if (!nb[gi].length) continue;
+          let sum = 0;
+          for (const j of nb[gi]) sum += prev[j];
+          push[gi] = Math.max(prev[gi], sum / nb[gi].length);
+        }
+      }
+      for (let i = 0; i < pos.count; i++) {
+        const k = push[group[i]] / scale;
+        if (k) pos.setXYZ(i, pos.getX(i) + nor.getX(i) * k, pos.getY(i) + nor.getY(i) * k, pos.getZ(i) + nor.getZ(i) * k);
+      }
+      g.computeBoundingSphere();
     }
   }
 
@@ -1255,6 +1326,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
       if (layer.unequipped) out.layers[layerKey].unequipped = true;
       if (layer.fx) out.layers[layerKey].fx = layer.fx;
       if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
+      if (layer.over) out.layers[layerKey].over = Object.fromEntries(Object.entries(layer.over).map(([k, m]) => [k, Math.round((m / (far - near)) * 255)]));
       setVisible(ctx, meshes);
       const blade = layer.blade && splits.has(layer.blade.mesh) ? bladeLocalOf(layer.blade) : null;
       for (const [clipKey, clipName] of Object.entries(p.clips)) {

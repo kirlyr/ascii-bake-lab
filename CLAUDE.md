@@ -70,6 +70,10 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Perbaikan 2026-11-28 sore (user minta): partikel rune/aura punya depth saat lahir dan tidak digambar di belakang sel
   yang lebih dekat (efek senjata tidak tembus badan saat diputar ke belakang), Rambut Buzzed `bias: 0.01` (depth 1 cm per
   unit, rambut tipis kalah seri dari kulit kepala), tulang Broken Wings pakai part `plume` (putih tulang, bukan kayu).
+- Perbaikan 2026-11-28 malam (user minta): rompi Ranger dipas ke badan Superhero saat load (`BakeParams.fit`: verteks
+  yang tenggelam di kulit didorong keluar sepanjang normal via raycast pose rest, dirambatkan ke tetangga). Jubah menang
+  atas slot torso lewat field layer baru `over` (bias per slot, compose dua arah); physics jubah tidak diubah (user
+  minta, sudah bagus). Masih ada: rompi tembus sayap Fallen Wings dari belakang (sudah ada sebelumnya).
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
