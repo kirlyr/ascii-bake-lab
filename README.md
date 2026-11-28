@@ -151,7 +151,9 @@ BakeFile).
 ## Runtime
 
 - `src/shared/compose.ts`: each cell takes the layer with the smallest depth minus the layer's `bias`, so armour wins
-  over skin that is only a few centimetres in front of it. Mirroring flips columns and sockets.
+  over skin that is only a few centimetres in front of it. A layer can also carry `over` (extra bias against specific
+  slots, applied in both directions): the cloak, the three wing sets and the longbow & quiver use `over: { torso }`
+  so chest armour never pokes through them. Mirroring flips columns and sockets.
 - `src/shared/materials.ts`: a material is a glyph per shade level plus dark → light colour stops, with defaults per
   part (skin, plate, cloth, leather, wood, …). Low levels stay `.:-=` so edges never disappear.
 - `src/shared/ascii-canvas.ts`: materials compile into a 256-entry table (cell byte → glyph + colour), so changing a
@@ -191,6 +193,9 @@ Character fixes worth knowing about:
   `Sword_Idle` (`overlays` in the preset). The hand closes on the hilt and the sword does not swing with the arm.
 - **Skin poking through clothes**: the body is larger than the outfit's base body, so outfits are inflated 2 cm along
   their normals at bake time (`outfitInflate`) and armour layers get a 4 cm `bias` when composing.
+- **Fitted ranger jerkin**: `BakeParams.fit` raycasts the outfit against the body in the rest pose, pushes vertices that
+  sink into the skin out along their normals and spreads the correction to neighbouring vertices, so the shoulders and
+  back no longer show through.
 
 ![before and after](docs/media/hero-before-after.png)
 
