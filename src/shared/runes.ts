@@ -1,7 +1,7 @@
 // Rune / aura = emitter partikel glyph. Rune menempel ke socket blade, aura ke tepi silhouette satu layer.
 // Tanpa Three.js.
 // Partikel hidup di koordinat grid (unit sel) dan digambar di-snap ke sel supaya tetap terasa ASCII.
-import type { BladeSocket } from './format';
+import type { BakeFile, BladeSocket } from './format';
 import { edgeCells, type Grid } from './compose';
 
 export interface RuneDef {
@@ -136,9 +136,21 @@ export const alongBlade = (blade: BladeSocket | null): Spawn =>
     return [blade.base[0] + (blade.tip[0] - blade.base[0]) * t, blade.base[1] + (blade.tip[1] - blade.base[1]) * t];
   });
 
+/** Part id dari `fx` layer (part yang memancarkan efek), atau undefined = seluruh layer. */
+const fxParts = (file: BakeFile, layer: string) => file.layers[layer]?.fx?.map((p) => file.parts.indexOf(p));
+
+/** Spawn aura satu layer: tepi silhouette-nya, atau hanya part `fx` layer itu. */
+export const auraSpawn = (grid: Grid, file: BakeFile, layer: string): Spawn => alongEdge(grid, layer, fxParts(file, layer));
+
+/** Spawn rune: socket blade, kecuali senjata punya `fx` (flail: rantai + bola, bukan gagang). */
+export function runeSpawn(grid: Grid, file: BakeFile, weapon: string | null | undefined): Spawn {
+  const fx = weapon ? fxParts(file, weapon) : undefined;
+  return fx && weapon ? alongEdge(grid, weapon, fx) : alongBlade(grid.blade);
+}
+
 /** Spawn acak di sel tepi silhouette satu layer. Dihitung ulang saat frame berganti. */
-export function alongEdge(grid: Grid, layer: string): Spawn {
-  const edge = edgeCells(grid, layer);
+export function alongEdge(grid: Grid, layer: string, parts?: number[]): Spawn {
+  const edge = edgeCells(grid, layer, parts);
   if (!edge.length) return null;
   return () => {
     const i = edge[Math.floor(Math.random() * edge.length)];

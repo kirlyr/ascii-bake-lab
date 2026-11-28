@@ -30,15 +30,19 @@ export function defaultLoadout(file: BakeFile): Loadout {
   };
 }
 
-/** Baca loadout tersimpan. Nilai yang tidak dikenal file ini (layer dihapus, palet diganti) jatuh ke default. */
-export function loadLoadout(file: BakeFile): Loadout {
+/**
+ * Baca loadout tersimpan. Nilai yang tidak dikenal file ini (layer dihapus, palet diganti) jatuh ke default.
+ * `fallback` dipakai kalau belum ada yang tersimpan (mis. susunan karakter pilihan pemilik situs).
+ */
+export function loadLoadout(file: BakeFile, fallback: Partial<Loadout> | null = null): Loadout {
   const out = defaultLoadout(file);
   let saved: Partial<Loadout> | null = null;
   try {
     saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
   } catch {
-    return out;
+    // storage diblokir / JSON rusak: pakai fallback
   }
+  saved ??= fallback;
   if (!saved || typeof saved !== 'object') return out;
   for (const [slot, layer] of Object.entries(saved.equip ?? {})) {
     if (!(slot in out.equip)) continue;

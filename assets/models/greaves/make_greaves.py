@@ -5,7 +5,8 @@ Koordinat = ruang model saat rest pose (Y atas, +Z depan, meter, kaki kiri di +X
 jadi bake tool memindahkan mesh ini ke ruang lokal tulangnya sendiri. Tiap potongan kaku, ikut satu tulang:
 - Thigh_<s>: pelat paha (setengah tabung depan, 3 lame) → thigh_<s>
 - Greave_<s>: tempurung lutut + pelindung tulang kering (tabung penuh) → calf_<s>
-- Sabaton_<s>: sepatu besi berlapis → foot_<s>
+- Sabaton_<s>: sepatu besi berlapis, mengikuti profil kaki → foot_<s> (SabatonToe_<s>: bagian jari → ball_<s>); Ankle_<s>: kerah pergelangan → calf_<s>
+- SabatonLean_<s> (bot kulit + tutup jari besi) → foot_<s>; BootLean_<s>: batang bot sampai bawah lutut → calf_<s>
 """
 import json, math, struct, sys
 from pathlib import Path
@@ -73,23 +74,102 @@ def greave(s):
     return [(*knee, 'Plate'), (*shin, 'Plate')]
 
 
-def sabaton(s, k=1.0, lames=5):
-    x = LEG_X * s
-    z0, z1 = -0.15, 0.2  # tumit → ujung jari
+# Profil kaki badan UBC (kaki kanan, |x|), diukur dari vertex ber-bobot foot/ball: per z (tumit → jari)
+# pusat x, setengah lebar, tinggi punggung kaki. Sepatu dibangun mengikuti profil ini supaya tidak menggembung.
+FOOT_Z = [-0.155, -0.13, -0.11, -0.09, -0.07, -0.05, -0.03, -0.01, 0.01, 0.03, 0.05, 0.07, 0.09, 0.11, 0.13, 0.145]
+FOOT_CX = [0.12, 0.122, 0.122, 0.12, 0.121, 0.126, 0.13, 0.132, 0.134, 0.134, 0.132, 0.131, 0.124, 0.118, 0.115, 0.113]
+FOOT_HW = [0.02, 0.031, 0.034, 0.037, 0.039, 0.04, 0.044, 0.048, 0.049, 0.052, 0.054, 0.053, 0.045, 0.036, 0.028, 0.014]
+FOOT_TOP = [0.1, 0.105, 0.105, 0.105, 0.104, 0.1, 0.085, 0.075, 0.064, 0.056, 0.048, 0.04, 0.034, 0.03, 0.026, 0.018]
+# Pergelangan + betis bawah (elips): y, pusat |x|, pusat z, setengah lebar x, setengah lebar z.
+ANKLE = [(0.05, 0.12, -0.08, 0.034, 0.05), (0.09, 0.1215, -0.081, 0.032, 0.048), (0.12, 0.1225, -0.0845, 0.031, 0.045),
+         (0.15, 0.1275, -0.087, 0.031, 0.046), (0.21, 0.1285, -0.088, 0.036, 0.05), (0.24, 0.1295, -0.0865, 0.043, 0.055),
+         (0.27, 0.129, -0.085, 0.05, 0.06), (0.33, 0.127, -0.0855, 0.059, 0.069),
+         (0.38, 0.1255, -0.083, 0.065, 0.078), (0.44, 0.1255, -0.075, 0.062, 0.075)]
 
-    def point(t, u):
-        z = lerp(z0, z1, t)
-        h = 0.15 * (1 - t) ** 0.6 + 0.05 * t if t < 0.55 else lerp(0.105, 0.06, (t - 0.55) / 0.45)
-        w = (0.062 + 0.014 * math.sin(t * math.pi)) * k
-        # Ujung jari dan tumit ditutup membulat supaya kaki tidak terlihat dari depan/belakang.
-        close = min(1.0, (1 - t) / 0.15) ** 0.5 * min(1.0, t / 0.12) ** 0.5
-        w *= 0.15 + 0.85 * close
-        h *= (0.15 + 0.85 * close) * (0.5 + 0.5 * k)
-        a = (u - 0.5) * math.pi * 1.15  # sedikit melewati samping sampai ke sol
-        lame = sawtooth(t, lames, 0.006) if t > 0.35 else 0.0
-        return [x + math.sin(a) * (w + lame), max(0.0, math.cos(a)) * (h + lame) + 0.004, z]
 
-    return [(*surface(20, 24, point), 'Plate')]
+def interp(xs, ys, x):
+    if x <= xs[0]:
+        return ys[0]
+    for i in range(1, len(xs)):
+        if x <= xs[i]:
+            return lerp(ys[i - 1], ys[i], (x - xs[i - 1]) / (xs[i] - xs[i - 1]))
+    return ys[-1]
+
+
+def shoe(s, z0, z1, margin, toe=0.145, point=0.0, lames=0, rise=0.0, part=None, rows=24, cols=24):
+    """Cangkang sepatu dari tumit z0 ke ujung z1, mengikuti profil kaki + `margin`. `toe` = ujung jari asli;
+    lewat itu (sampai z1) cangkang meruncing ke titik (`point` = sisa setengah lebar di ujung, 0 = lancip).
+    `rise` = tinggi cangkang di tumit (menutup pangkal pergelangan). `part` = (za, zb): hanya potongan itu
+    (belakang ikut tulang foot, depan ikut tulang ball supaya jari yang menekuk tetap tertutup)."""
+    za, zb = part or (z0, z1)
+
+    def pt(t, u):
+        z = lerp(max(z0, za), min(z1, zb), t)
+        zf = min(z, toe)
+        cx = interp(FOOT_Z, FOOT_CX, zf)
+        hw = interp(FOOT_Z, FOOT_HW, zf)
+        top = interp(FOOT_Z, FOOT_TOP, zf)
+        if z > toe:  # moncong lancip melewati jari
+            k = (z - toe) / max(1e-6, z1 - toe)
+            hw = lerp(hw + margin, point, k ** 0.8) - margin
+            top = lerp(top + margin, 0.012, k) - margin
+        if z < -0.1:  # tumit membulat ke belakang
+            k = min(1.0, (-0.1 - z) / (-0.1 - z0))
+            hw *= math.sqrt(max(0.0, 1 - k ** 2)) * 0.6 + 0.4
+        top += rise * max(0.0, 1 - (z - z0) / 0.12)
+        lame = sawtooth((z + 0.07) / 0.18, lames, 0.005) if lames and -0.07 < z < 0.11 else 0.0
+        a = (u - 0.5) * math.pi * 1.25  # dinding melengkung sedikit ke bawah sol
+        # 1,5 cm paling belakang/depan dirapatkan supaya cangkang tertutup (jari tidak menyembul).
+        close = min(1.0, (z - z0) / 0.015) ** 0.5 * min(1.0, (z1 - z) / 0.015) ** 0.5
+        w = (hw + margin + lame) * (0.2 + 0.8 * close)
+        # Punggung kaki memuai saat pergelangan/jari menekuk (vertex berbobot campuran), jadi atasnya diberi ruang lebih.
+        instep = 0.014 * max(0.0, 1 - abs(z - 0.03) / 0.1)
+        h = (top + margin + instep + lame) * (0.3 + 0.7 * close)
+        return [s * cx + math.sin(a) * w, max(0.0, math.cos(a)) * h - 0.004, z]
+
+    return surface(rows, cols, pt)
+
+
+def cuff(s, y0, y1, margin, flare=0.0, arc=360, lames=0, rows=12, cols=28):
+    """Tabung elips mengikuti pergelangan/betis bawah dari y0 ke y1, + `margin`; `flare` = bibir atas melebar."""
+
+    def pt(t, u):
+        y = lerp(y0, y1, t)
+        ys = [a[0] for a in ANKLE]
+        cx, cz, rx, rz = (interp(ys, [a[k] for a in ANKLE], y) for k in range(1, 5))
+        m = margin + flare * max(0.0, (t - 0.75) / 0.25) ** 2 + sawtooth(t, lames, 0.006)
+        a = math.radians((u - 0.5) * arc)
+        return [s * cx + math.sin(a) * (rx + m) * s, y, cz + math.cos(a) * (rz + m)]
+
+    return surface(rows, cols, pt)
+
+
+BALL = 0.055  # sendi pangkal jari (tulang ball) di sumbu z; potongan depan dan belakang bertumpuk 4 cm di sekitarnya
+REAR, FRONT = (-1.0, BALL + 0.02), (BALL - 0.02, 1.0)
+
+
+def sabaton(s, part=REAR):
+    """Iron Sabatons: sepatu besi gothic berlapis (6 lame di punggung kaki), moncong lancip, mengikuti bentuk kaki."""
+    return [(*shoe(s, -0.165, 0.19, 0.012, point=0.0, lames=6, rise=0.02, part=part), 'Plate')]
+
+
+def ankle_guard(s):
+    """Kerah pergelangan Iron Sabatons (ikut tulang betis supaya tidak menembus saat pergelangan menekuk)."""
+    return [(*cuff(s, 0.075, 0.185, 0.012, flare=0.008, lames=2), 'Plate')]
+
+
+def duelist_shoe(s, part=REAR):
+    """Duelist Sabatons: sepatu bot kulit ramping + tutup jari dan pelat punggung kaki dari besi."""
+    leather = shoe(s, -0.165, 0.162, 0.0105, point=0.03, rise=0.03, part=part)
+    out = [(*leather, 'Leather')]
+    if part == FRONT:
+        out.append((*shoe(s, 0.02, 0.168, 0.013, point=0.034, part=part), 'Plate'))
+    return out
+
+
+def duelist_shaft(s):
+    """Batang bot kulit sampai bawah lutut (ikut tulang betis), dengan sabuk besi tipis di pergelangan."""
+    return [(*cuff(s, 0.07, 0.42, 0.008, flare=0.01, rows=18), 'Leather'), (*cuff(s, 0.1, 0.13, 0.011, rows=2), 'Plate')]
 
 
 def thigh_lean(s):
@@ -156,11 +236,11 @@ def write_glb(path, parts, colors, name):
 if __name__ == '__main__':
     here = Path(sys.argv[0]).resolve().parent
     # Abu-abu besi: warna akhir dari pewarna part `armor` (Plate) di runtime.
-    colors = {'Plate': [0.62, 0.62, 0.64, 1]}
+    colors = {'Plate': [0.62, 0.62, 0.64, 1], 'Leather': [0.4, 0.27, 0.16, 1]}
     for s, side in ((1, 'L'), (-1, 'R')):
-        for name, fn in (('Thigh', thigh), ('Greave', greave), ('Sabaton', sabaton)):
+        for name, fn in (('Thigh', thigh), ('Greave', greave), ('Sabaton', sabaton), ('SabatonToe', lambda s: sabaton(s, FRONT)), ('Ankle', ankle_guard)):
             write_glb(here / f'{name}_{side}.glb', fn(s), colors, f'{name}_{side}')
-        # Set ramping (lean): pelat lebih tipis menempel, sepatu besi lebih langsing dengan lame lebih sedikit.
-        for name, fn in (('ThighLean', thigh_lean), ('GreaveLean', greave_lean), ('SabatonLean', lambda s: sabaton(s, 0.88, 3))):
+        # Set ramping (lean): pelat lebih tipis menempel; kaki = bot kulit ramping dengan tutup jari besi.
+        for name, fn in (('ThighLean', thigh_lean), ('GreaveLean', greave_lean), ('SabatonLean', duelist_shoe), ('SabatonLeanToe', lambda s: duelist_shoe(s, FRONT)), ('BootLean', duelist_shaft)):
             write_glb(here / f'{name}_{side}.glb', fn(s), colors, f'{name}_{side}')
     print('ok')

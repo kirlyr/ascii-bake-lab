@@ -1,6 +1,6 @@
 // Runtime compose: tumpuk beberapa layer per sel berdasarkan depth terdekat (dikurangi bias layer).
 // Tanpa Three.js. Dipakai player dan preview di bake tool.
-import { b64decode, EMPTY_DEPTH, type BakeFile, type BladeSocket, type Planes } from './format';
+import { b64decode, cellPart, EMPTY_DEPTH, type BakeFile, type BladeSocket, type Planes } from './format';
 
 export interface DecodedFrame {
   x: number;
@@ -114,16 +114,18 @@ export function composeFrame(sprite: Sprite, grid: Grid, clip: string, frame: nu
  * Sel tepi silhouette milik satu layer (yang terlihat): sel milik layer dengan tetangga 4-arah kosong
  * atau milik layer lain. Sumber spawn aura. Hasil = index sel.
  */
-export function edgeCells(grid: Grid, layer: string): number[] {
+export function edgeCells(grid: Grid, layer: string, parts?: number[]): number[] {
   const id = grid.layers.indexOf(layer) + 1;
   if (!id) return [];
-  const { cols, rows, owner } = grid;
+  const { cols, rows, owner, cell } = grid;
+  // `parts`: hanya sel layer ini dengan part tersebut yang dihitung (tepi = berbatasan dengan sel lain).
+  const own = (i: number) => owner[i] === id && (!parts || parts.includes(cellPart(cell[i])));
   const out: number[] = [];
   for (let y = 0; y < rows; y++)
     for (let x = 0; x < cols; x++) {
       const i = y * cols + x;
-      if (owner[i] !== id) continue;
-      if (x === 0 || y === 0 || x === cols - 1 || y === rows - 1 || owner[i - 1] !== id || owner[i + 1] !== id || owner[i - cols] !== id || owner[i + cols] !== id) out.push(i);
+      if (!own(i)) continue;
+      if (x === 0 || y === 0 || x === cols - 1 || y === rows - 1 || !own(i - 1) || !own(i + 1) || !own(i - cols) || !own(i + cols)) out.push(i);
     }
   return out;
 }
