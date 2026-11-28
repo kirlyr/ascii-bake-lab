@@ -138,6 +138,12 @@ export interface BakeParams {
    * (Superhero vs tubuh Regular untuk outfit Ranger) tidak menembus.
    */
   outfitInflate?: number;
+  /**
+   * Salinan mesh skinned (mis. tunik Peasant → chainmail): geometri + material sendiri, ikut skeleton yang sama.
+   * `inflate` (m) = digelembungkan lagi sepanjang normal; `mail` (m) = periode pola cincin rantai yang dilukis di
+   * fragment shader dari posisi bind (menempel di permukaan, tidak berenang saat animasi).
+   */
+  copies?: { from: string; name: string; inflate?: number; mail?: number }[];
   /** mesh yang selalu disembunyikan. */
   hidden: string[];
   /** ramp gelap → terang. Index glyph hasil shape matching = shade level. */
@@ -225,6 +231,26 @@ export const DEFAULT_PARAMS: BakeParams = {
         ]),
       ],
     },
+    // Jubah bahu tudung: tabung kain pendek dipaku di leher, lengan yang berayun mendorong ujungnya.
+    ...(['capelet:Cloth'] as const).map((mesh): ClothSpec => ({
+      mesh,
+      cols: 36,
+      wrap: true,
+      axis: 'spine_03',
+      pinRows: 2,
+      shape: 0.5,
+      drag: 1.6,
+      wind: { walk: 0.8 },
+      colliders: [
+        { from: 'spine_02', to: 'spine_03', radius: 0.18 },
+        { from: 'spine_03', to: 'neck_01', radius: 0.17 },
+        { from: 'upperarm_l', to: 'upperarm_r', radius: 0.1 },
+        ...(['l', 'r'] as const).flatMap((s) => [
+          { from: `clavicle_${s}`, to: `upperarm_${s}`, radius: 0.1 },
+          { from: `upperarm_${s}`, to: `lowerarm_${s}`, radius: 0.08 },
+        ]),
+      ],
+    })),
     // Rok robe: tabung kain tertutup (`wrap`) dipaku di pinggang, kaki menendang ujungnya saat berjalan.
     ...['robe:Cloth', 'robe_tattered:Cloth'].map((mesh): ClothSpec => ({
       mesh,
@@ -274,6 +300,11 @@ export const DEFAULT_PARAMS: BakeParams = {
   // Rambut + janggut Universal Base Characters (sudah di-rig ke skeleton yang sama).
   outfits: [`${O}/Male_Ranger.gltf`, `${O}/Male_Peasant.gltf`, ...['SimpleParted', 'Buzzed', 'Long', 'Beard'].map((h) => `${UBC}/Hair_${h}.gltf`)],
   outfitInflate: 0.02,
+  // Chainmail = salinan tunik Peasant (panjang sampai paha, lengan panjang) dengan pola cincin rantai.
+  copies: [
+    { from: 'Male_Peasant_Body', name: 'mail:Body', inflate: 0.012, mail: 0.04 },
+    { from: 'Male_Peasant_Arms_1', name: 'mail:Arms', inflate: 0.01, mail: 0.04 },
+  ],
   attachments: [
     ...['Helmet1', 'Helmet2', 'Helmet3'].map((h) => helm(h.toLowerCase(), `${Q}/${h}.glb`)),
     weapon('sword', `${Q}/Sword.glb`),
@@ -309,6 +340,15 @@ export const DEFAULT_PARAMS: BakeParams = {
     { name: 'fauld_lean', url: '/assets/models/cuirass/FauldLean.glb', bone: 'spine_01', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
     { name: 'robe', url: '/assets/models/robe/Robe.glb', bone: 'pelvis', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
     { name: 'robe_tattered', url: '/assets/models/robe/RobeTattered.glb', bone: 'pelvis', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
+    // Tudung gelap + jubah bahu buatan sendiri (assets/models/hood/make_hood.py), ruang model rest pose.
+    { name: 'hood', url: '/assets/models/hood/Hood.glb', bone: 'Head', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
+    { name: 'capelet', url: '/assets/models/hood/Capelet.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
+    // Busur (Ultimate RPG Pack, CC0) + tabung panah buatan sendiri (assets/models/quiver/make_quiver.py) di punggung,
+    // menyilang: tabung dari pinggang kiri ke bahu kanan, busur dari pinggul kanan ke atas bahu kiri. Ruang pose idle.
+    { name: 'quiver', url: '/assets/models/quiver/Quiver.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true, restClip: 'idle' },
+    { name: 'bow', url: `${W}/Bow_Wooden.glb`, bone: 'spine_03', position: [0.02, 1.22, -0.27], rotation: [0, 0, -27], scale: 0.6, rest: true, restClip: 'idle' },
+    // Mantel bulu buatan sendiri (assets/models/mantle/make_mantle.py), kaku, dibuat di pose idle.
+    { name: 'mantle', url: '/assets/models/mantle/FurMantle.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true, restClip: 'idle' },
     // Halo + janggut panjang buatan sendiri (assets/models/accessories/make_accessories.py), ruang model rest pose.
     { name: 'halo', url: '/assets/models/accessories/Halo.glb', bone: 'Head', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
     { name: 'beard_long', url: '/assets/models/accessories/BeardLong.glb', bone: 'Head', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true },
@@ -357,6 +397,7 @@ export const DEFAULT_PARAMS: BakeParams = {
       parts: { cloth: ['Male_Ranger_Body'], leather: ['Male_Ranger_Body_Belt_1', 'Male_Ranger_Body_Belt_2', 'Male_Ranger_Arms_Bracer'] },
     },
     peasant_torso: { label: 'Tunik Petani', slot: 'torso', bias: 0.04, parts: { linen: ['Male_Peasant_Body', 'Male_Peasant_Arms_1'] } },
+    chainmail: { label: 'Zirah Rantai', slot: 'torso', bias: 0.05, parts: { armor: ['mail:Body', 'mail:Arms'] } },
     cuirass_leather: { bias: 0.04, label: 'Leather Cuirass', slot: 'torso', parts: { leather: ['cuirass_leather:Brown'] } },
     cuirass_metal: { bias: 0.04, label: 'Iron Cuirass', slot: 'torso', parts: { armor: ['cuirass_metal:DarkSteel'] } },
     cuirass_metal2: { bias: 0.04, label: 'Steel Cuirass', slot: 'torso', parts: { armor: ['cuirass_metal2:LightSteel'] } },
@@ -384,8 +425,15 @@ export const DEFAULT_PARAMS: BakeParams = {
     },
     ranger_pauldron: { label: 'Pauldron Ranger', slot: 'shoulder', bias: 0.04, parts: { armor: ['Male_Ranger_Acc_Pauldron'] } },
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
+    fur_mantle: { label: 'Mantel Bulu', slot: 'shoulder', bias: 0.05, parts: { wool: ['mantle:Fur'] } },
     // Bias sedikit di atas baju (0,04): jubah menempel di punggung. Lebih besar = jubah menutupi lengan dari samping.
     cloak: { label: 'Cloak', slot: 'back', bias: 0.05, parts: { cloak: ['cloak:Cloth'] } },
+    quiver_bow: {
+      label: 'Busur & Tabung Panah',
+      slot: 'back',
+      bias: 0.03,
+      parts: { leather: ['quiver:Leather'], wood: ['quiver:Wood', 'bow:DarkWood', 'bow:LightWood'], feather: ['quiver:Feather'], linen: ['bow:White'] },
+    },
     wings: { label: 'Fallen Wings', slot: 'back', bias: 0.02, parts: { feather: ['wings:Feather', 'wings:Bone'] } },
     // Sayap malaikat memakai part `plume` (bawaan putih) supaya tidak ikut pewarna sayap gelap.
     wings_angel: { label: 'Angel Wings', slot: 'back', bias: 0.02, parts: { plume: ['wings_angel:Feather', 'wings_angel:Bone'] } },
@@ -397,6 +445,7 @@ export const DEFAULT_PARAMS: BakeParams = {
     crown: { label: 'Mahkota', slot: 'helmet', bias: 0.03, parts: { trim: ['crown:Gold'] } },
     // Halo memakai part `trim` (emas): format sel hanya muat 16 part.
     halo: { label: 'Halo', slot: 'helmet', parts: { trim: ['halo:Gold'] } },
+    hood: { label: 'Tudung', slot: 'helmet', bias: 0.05, hides: ['hair'], parts: { cloak: ['hood:Cloth', 'capelet:Cloth'] } },
     crown2: { label: 'Mahkota Rubi', slot: 'helmet', bias: 0.03, parts: { trim: ['crown2:Gold'], gem: ['crown2:Red'] } },
     // Pedang Quaternius: blade sudah mesh terpisah, sumbu lokal +Z. `at` = pangkal blade (sumber socket).
     sword: {
@@ -562,6 +611,33 @@ void main() {
   gl_FragColor = vec4(clamp((vViewZ - uNear) / (uFar - uNear), 0.0, 1.0), 0.0, 0.0, 1.0);
 }`;
 
+/**
+ * Pola chainmail: cincin-cincin kecil (baris berselang setengah periode) yang menggelapkan warna di sela cincin.
+ * Dihitung dari posisi bind di fragment shader, jadi menempel di permukaan. `userData.mail` = periode (unit mesh).
+ */
+function withMail<T extends THREE.Material>(m: T): T {
+  const period = m.userData.mail as number | undefined;
+  if (!period) return m;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uMail = { value: period };
+    sh.vertexShader = sh.vertexShader
+      .replace('void main() {', 'varying vec3 vMailPos;\nvoid main() {')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMailPos = position;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('void main() {', 'uniform float uMail;\nvarying vec3 vMailPos;\nvoid main() {')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        vec2 q = vec2(atan(vMailPos.x, vMailPos.z) * length(vMailPos.xz), vMailPos.y) / uMail;
+        q.x += 0.5 * mod(floor(q.y), 2.0);
+        float ring = smoothstep(0.5, 0.2, length(fract(q) - 0.5));
+        diffuseColor.rgb *= 0.5 + 0.5 * ring;`,
+      );
+  };
+  m.customProgramCacheKey = () => `mail${period}`;
+  return m;
+}
+
 function makeDepthMaterial(near: number, far: number) {
   return new THREE.ShaderMaterial({
     vertexShader: depthVert,
@@ -671,6 +747,27 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
       }
       meshes.set(m.name, m);
     }
+  }
+
+  for (const c of p.copies ?? []) {
+    const src = meshes.get(c.from) as THREE.SkinnedMesh | undefined;
+    if (!src?.isSkinnedMesh) throw new Error(`copies: mesh skinned "${c.from}" tidak ada`);
+    const m = src.clone();
+    m.name = c.name;
+    m.geometry = src.geometry.clone();
+    src.parent!.add(m);
+    m.bind(src.skeleton, src.bindMatrix);
+    m.updateMatrixWorld(true);
+    const unit = 1 / m.matrixWorld.getMaxScaleOnAxis(); // meter → unit mesh
+    if (c.inflate) {
+      const pos = m.geometry.attributes.position, nor = m.geometry.attributes.normal;
+      const k = c.inflate * unit;
+      for (let i = 0; i < pos.count; i++) pos.setXYZ(i, pos.getX(i) + nor.getX(i) * k, pos.getY(i) + nor.getY(i) * k, pos.getZ(i) + nor.getZ(i) * k);
+    }
+    const mat = (src.material as THREE.Material).clone();
+    if (c.mail) mat.userData.mail = c.mail * unit;
+    m.material = withMail(mat);
+    meshes.set(c.name, m);
   }
 
   const animations = [...model.animations];
@@ -1069,7 +1166,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
     const c = m.clone() as THREE.MeshStandardMaterial;
     c.map = null;
     c.color?.set(0xffffff);
-    return c;
+    return withMail(c);
   };
   if (p.albedo < 1)
     for (const m of ctx.meshes.values()) {
