@@ -73,7 +73,7 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Perbaikan 2026-11-28 malam (user minta): rompi Ranger dipas ke badan Superhero saat load (`BakeParams.fit`: verteks
   yang tenggelam di kulit didorong keluar sepanjang normal via raycast pose rest, dirambatkan ke tetangga). Jubah menang
   atas slot torso lewat field layer baru `over` (bias per slot, compose dua arah); physics jubah tidak diubah (user
-  minta, sudah bagus). Masih ada: rompi tembus sayap Fallen Wings dari belakang (sudah ada sebelumnya).
+  minta, sudah bagus). Sayap dan busur + tabung panah juga diberi `over: { torso: 0.15 }` (user setuju).
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)

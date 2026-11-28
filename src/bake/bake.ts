@@ -437,18 +437,19 @@ export const DEFAULT_PARAMS: BakeParams = {
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
     fur_mantle: { label: 'Mantel Bulu', slot: 'shoulder', bias: 0.05, parts: { wool: ['mantle:Fur'] } },
     // Bias sedikit di atas baju (0,04): jubah menempel di punggung. Lebih besar = jubah menutupi lengan dari samping.
-    // Rompi yang dipas ke badan Superhero menembus jubah di punggung atas; jubah menang atas slot torso saja.
+    // Rompi yang dipas ke badan Superhero menembus item punggung; item punggung menang atas slot torso saja (`over`).
     cloak: { label: 'Cloak', slot: 'back', bias: 0.05, over: { torso: 0.15 }, parts: { cloak: ['cloak:Cloth'] } },
     quiver_bow: {
       label: 'Busur & Tabung Panah',
       slot: 'back',
       bias: 0.03,
+      over: { torso: 0.15 },
       parts: { leather: ['quiver:Leather'], wood: ['quiver:Wood', 'bow:DarkWood', 'bow:LightWood'], feather: ['quiver:Feather'], linen: ['bow:White'] },
     },
-    wings: { label: 'Fallen Wings', slot: 'back', bias: 0.02, parts: { feather: ['wings:Feather', 'wings:Bone'] } },
+    wings: { label: 'Fallen Wings', slot: 'back', bias: 0.02, over: { torso: 0.15 }, parts: { feather: ['wings:Feather', 'wings:Bone'] } },
     // Sayap malaikat memakai part `plume` (bawaan putih) supaya tidak ikut pewarna sayap gelap.
-    wings_angel: { label: 'Angel Wings', slot: 'back', bias: 0.02, parts: { plume: ['wings_angel:Feather', 'wings_angel:Bone'] } },
-    wings_broken: { label: 'Broken Wings', slot: 'back', bias: 0.02, parts: { feather: ['wings_broken:Feather'], plume: ['wings_broken:Bone'] } },
+    wings_angel: { label: 'Angel Wings', slot: 'back', bias: 0.02, over: { torso: 0.15 }, parts: { plume: ['wings_angel:Feather', 'wings_angel:Bone'] } },
+    wings_broken: { label: 'Broken Wings', slot: 'back', bias: 0.02, over: { torso: 0.15 }, parts: { feather: ['wings_broken:Feather'], plume: ['wings_broken:Bone'] } },
     // Varian per slot = layer terpisah. Ukuran file = jumlah layer, bukan kombinasi.
     helmet1: { bias: 0.02, hides: ['hair'], label: 'Helm Besi', slot: 'helmet', parts: { helmet: ['helmet1:Grey', 'helmet1:DarkGrey'] } },
     helmet2: { bias: 0.02, hides: ['hair'], label: 'Helm Ksatria', slot: 'helmet', parts: { helmet: ['helmet2:Grey'] } },
