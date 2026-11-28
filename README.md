@@ -67,7 +67,7 @@ dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
 |---|---|---|
 | Baju | Rompi Ranger, Tunik Petani, 5 zirah Ultimate RPG Pack, Zirah Ramping, Jubah Pengembara, Jubah Compang-camping (buatan sendiri) | cloth, leather, linen, armor, wool, cloak |
 | Celana | Celana Ranger, Celana Petani, Pelat Kaki, Pelat Kaki Ramping | cloth, wool, armor |
-| Sepatu | Sepatu Ranger, Sepatu Petani, Sepatu Besi, Sepatu Besi Ramping | leather, wool, armor |
+| Sepatu | Sepatu Ranger, Sepatu Petani, Iron Sabatons (gothic), Duelist Boots (bot kulit sampai lutut + tutup jari besi) | leather, wool, armor |
 | Bahu | Pauldron Ranger, Bahu Ksatria (`ShoulderPads`) | armor |
 | Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`), Halo (buatan sendiri) | helmet, trim, gem |
 | Punggung | Jubah, Fallen Wings, Angel Wings, Broken Wings (semua buatan sendiri) | cloak, feather, plume, wood |
@@ -127,6 +127,9 @@ Player (`/`) = Tavern wardrobe bergaya inventory game (UI berbahasa Inggris, tan
 blend `lighter`, efek bloom), glyph kecil yang di-snap ke sel, dan sesekali glyph besar 2× yang melayang bebas.
 Intensitas per efek bisa dipilih di panel detail: **Faint / Bright / Radiant** (`LEVELS`), mengalikan jumlah partikel,
 sebaran, umur, peluang glyph besar, dan ukuran halo. Disimpan di loadout (`levels`, key = slot aura atau `rune`).
+Aura lahir di tepi silhouette layer, rune di sepanjang socket blade. Layer dengan `fx` (daftar part) memancarkan
+keduanya hanya dari part itu: flail `fx: ['blade']`, jadi efek keluar dari rantai + bola, bukan gagang
+(`auraSpawn`/`runeSpawn`).
 
 ![level efek](docs/media/effect-levels.png)
 

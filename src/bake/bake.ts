@@ -19,6 +19,8 @@ export interface LayerDef {
   hides?: string[];
   /** true = slot ini kosong di susunan bawaan (mis. perisai). Hanya berlaku di layer pertama slot. */
   unequipped?: boolean;
+  /** part yang memancarkan aura/rune (lihat LayerData.fx). */
+  fx?: string[];
   /** hanya layer senjata: split hilt/blade + sumber socket blade. */
   blade?: BladeSplit;
   /** meter. Layer ini menang atas layer yang lebih dekat ≤ jarak ini (lihat LayerData.bias). */
@@ -57,8 +59,11 @@ export interface Attachment {
   scale: number | [number, number, number];
   /** derajat. Putar aksesori di sumbu panjangnya (Y setelah node -90° X) sebelum `rotation`. */
   spin?: number;
-  /** posisi genggaman di sumbu panjang mesh (koordinat lokal mesh, sumbu z). Digeser ke origin = tangan. */
-  grip?: number;
+  /**
+   * Posisi genggaman di sumbu panjang mesh (koordinat lokal mesh, sumbu z), atau [z, x] kalau gagang tidak di x = 0
+   * (Kapak Ganda). Digeser ke origin = tangan.
+   */
+  grip?: number | [number, number];
   /** true = position/rotation/scale di ruang model saat rest pose (atau `restClip`), bukan ruang tulang; tetap ikut tulang. */
   rest?: boolean;
   /**
@@ -286,7 +291,7 @@ export const DEFAULT_PARAMS: BakeParams = {
     { ...weapon('sword_big', `${W}/Sword_Big.glb`), scale: 0.18, grip: 0.005 },
     { ...weapon('sword_golden', `${W}/Sword_Golden.glb`), scale: 0.18 },
     { ...weapon('dagger', `${W}/Dagger.glb`), scale: 0.18, grip: -0.0008 },
-    { ...weapon('axe_double', `${W}/Axe_Double.glb`, 90), scale: 0.18, grip: -0.02 },
+    { ...weapon('axe_double', `${W}/Axe_Double.glb`, 90), scale: 0.18, grip: [-0.02, 0.0035] },
     { ...weapon('hammer_small', `${W}/Hammer_Small.glb`), scale: 0.18 },
     // Flail buatan sendiri (assets/models/flail/make_flail.py), konvensi node sama dengan pack Quaternius.
     { ...weapon('flail', '/assets/models/flail/Flail.glb'), scale: 0.18 },
@@ -312,7 +317,7 @@ export const DEFAULT_PARAMS: BakeParams = {
     { name: 'wings_broken', url: '/assets/models/wings/WingsBroken.glb', bone: 'spine_03', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, rest: true, restClip: 'idle' },
     // Pelat kaki + sepatu besi buatan sendiri (assets/models/greaves/make_greaves.py), dibuat di ruang model rest pose.
     ...(['l', 'r'] as const).flatMap((s): Attachment[] =>
-      ([['thigh', 'Thigh'], ['calf', 'Greave'], ['foot', 'Sabaton'], ['thigh', 'ThighLean'], ['calf', 'GreaveLean'], ['foot', 'SabatonLean']] as const).map(([bone, file]) => ({
+      ([['thigh', 'Thigh'], ['calf', 'Greave'], ['foot', 'Sabaton'], ['ball', 'SabatonToe'], ['calf', 'Ankle'], ['thigh', 'ThighLean'], ['calf', 'GreaveLean'], ['foot', 'SabatonLean'], ['ball', 'SabatonLeanToe'], ['calf', 'BootLean']] as const).map(([bone, file]) => ({
         name: `${file.toLowerCase()}_${s}`,
         url: `/assets/models/greaves/${file}_${s.toUpperCase()}.glb`,
         bone: `${bone}_${s}`,
@@ -368,9 +373,15 @@ export const DEFAULT_PARAMS: BakeParams = {
     peasant_feet: { label: 'Sepatu Petani', slot: 'feet', bias: 0.04, parts: { wool: ['Male_Peasant_Feet'] } },
     // Celana Ranger tetap di bawah pelat supaya celah antar pelat tidak menampakkan kulit.
     plate_legs: { label: 'Pelat Kaki', slot: 'legs', bias: 0.04, parts: { cloth: ['Male_Ranger_Legs'], armor: ['thigh_l:Plate', 'thigh_r:Plate', 'greave_l:Plate', 'greave_r:Plate'] } },
-    plate_feet: { label: 'Sepatu Besi', slot: 'feet', bias: 0.04, parts: { armor: ['sabaton_l:Plate', 'sabaton_r:Plate'] } },
+    plate_feet: { label: 'Sepatu Besi', slot: 'feet', bias: 0.04, parts: { armor: ['sabaton_l:Plate', 'sabaton_r:Plate', 'sabatontoe_l:Plate', 'sabatontoe_r:Plate', 'ankle_l:Plate', 'ankle_r:Plate'] } },
     lean_legs: { label: 'Pelat Kaki Ramping', slot: 'legs', bias: 0.04, parts: { cloth: ['Male_Ranger_Legs'], armor: ['thighlean_l:Plate', 'thighlean_r:Plate', 'greavelean_l:Plate', 'greavelean_r:Plate'] } },
-    lean_feet: { label: 'Sepatu Besi Ramping', slot: 'feet', bias: 0.04, parts: { armor: ['sabatonlean_l:Plate', 'sabatonlean_r:Plate'] } },
+    lean_feet: {
+      label: 'Sepatu Besi Ramping',
+      slot: 'feet',
+      bias: 0.04,
+      parts: { leather: ['sabatonlean_l:Leather', 'sabatonlean_r:Leather', 'sabatonleantoe_l:Leather', 'sabatonleantoe_r:Leather', 'bootlean_l:Leather', 'bootlean_r:Leather'],
+      armor: ['sabatonleantoe_l:Plate', 'sabatonleantoe_r:Plate', 'bootlean_l:Plate', 'bootlean_r:Plate'] },
+    },
     ranger_pauldron: { label: 'Pauldron Ranger', slot: 'shoulder', bias: 0.04, parts: { armor: ['Male_Ranger_Acc_Pauldron'] } },
     knight_pads: { label: 'Bahu Ksatria', slot: 'shoulder', parts: { armor: ['pads:Grey'] } },
     // Bias sedikit di atas baju (0,04): jubah menempel di punggung. Lebih besar = jubah menutupi lengan dari samping.
@@ -485,6 +496,7 @@ export const DEFAULT_PARAMS: BakeParams = {
       slot: 'weapon',
       parts: { blade: ['flail:Steel', 'flail:Chain', 'flail:Ball'], wood: ['flail:Wood'], hilt: ['flail:Leather'] },
       blade: { mesh: 'flail:Wood', axis: 'z', at: 0.004, below: 'wood', above: 'wood' },
+      fx: ['blade'],
     },
     // Perisai (slot Off-hand): kosong di susunan bawaan. Logam = pelat (bisa diwarnai Plate), kayu = kayu.
     shield_heater: {
@@ -701,7 +713,10 @@ export async function loadModel(p: BakeParams, renderer: THREE.WebGLRenderer): P
     holder.add(acc);
     acc.rotation.y = THREE.MathUtils.degToRad(a.spin ?? 0);
     // Node pack Quaternius: rotasi -90° X + skala 100, jadi sumbu z mesh = sumbu y scene.
-    if (a.grip) acc.position.y = -a.grip * 100;
+    if (a.grip) {
+      const [gz, gx = 0] = typeof a.grip === 'number' ? [a.grip] : a.grip;
+      acc.position.set(-gx * 100, -gz * 100, 0).applyEuler(acc.rotation);
+    }
     if (a.rest) {
       // holder = ruang model (rest pose, atau frame 0 `restClip`) → ruang tulang.
       // Mixer sementara; stopAllAction mengembalikan tulang ke rest pose untuk attachment berikutnya.
@@ -1141,6 +1156,7 @@ export async function bake(ctx: BakeContext, p: BakeParams, onProgress: Progress
       if (layer.slot) out.layers[layerKey].slot = layer.slot;
       if (layer.hides) out.layers[layerKey].hides = layer.hides;
       if (layer.unequipped) out.layers[layerKey].unequipped = true;
+      if (layer.fx) out.layers[layerKey].fx = layer.fx;
       if (layer.bias) out.layers[layerKey].bias = Math.round((layer.bias / (far - near)) * 255);
       setVisible(ctx, meshes);
       const blade = layer.blade && splits.has(layer.blade.mesh) ? bladeLocalOf(layer.blade) : null;

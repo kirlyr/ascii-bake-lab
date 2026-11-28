@@ -3,7 +3,7 @@
 import { loadBake, type BakeFile, type TurnFile } from '../shared/format';
 import { createGrid, decodeSprite, type Sprite } from '../shared/compose';
 import { AsciiCanvas } from '../shared/ascii-canvas';
-import { AURAS, RUNES, RuneEmitter, alongBlade, alongEdge, type Spawn } from '../shared/runes';
+import { AURAS, RUNES, RuneEmitter, auraSpawn, runeSpawn, type Spawn } from '../shared/runes';
 import { levelOf, loadLoadout, materialsFor } from '../shared/loadout';
 import { STEP, composeTurn, dragToRotate, normYaw, sideYaw, turnCols, turnSprites } from '../shared/turn';
 
@@ -32,11 +32,13 @@ const auras = playing
       .map(([slot, a]) => ({ slot, e: new RuneEmitter(AURAS[a], levelOf(lo, slot)) }))
   : [];
 const spawn: Record<string, Spawn> = {};
+let runeAt: Spawn = null;
 
 let frame = 0;
 function compose() {
   composeTurn(grid, sprite, views, yaw, 'idle', frame, lo.equip);
-  for (const a of auras) spawn[a.slot] = alongEdge(grid, lo.equip[a.slot]!);
+  for (const a of auras) spawn[a.slot] = auraSpawn(grid, file, lo.equip[a.slot]!);
+  runeAt = runeSpawn(grid, file, lo.equip.weapon);
 }
 function paint() {
   view.draw(grid, 'material', false);
@@ -62,7 +64,7 @@ if (playing) {
       acc %= step;
       compose();
     }
-    rune?.update(dt, alongBlade(grid.blade));
+    rune?.update(dt, runeAt);
     for (const a of auras) a.e.update(dt, spawn[a.slot] ?? null);
     paint();
     requestAnimationFrame(tick);

@@ -65,7 +65,7 @@ def smooth_normals(verts, idx):
     return out
 
 
-def halo(center=(0.0, 1.93, -0.02), R=0.12, r=0.014, tilt=12, seg=48, tube=10):
+def halo(center=(0.0, 1.91, -0.02), R=0.08, r=0.01, tilt=12, seg=48, tube=10):
     """Torus di sekitar sumbu Y, lalu dicondongkan ke depan (tepi depan turun) `tilt` derajat."""
     ct, st = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
     verts, cols, idx = [], [], []

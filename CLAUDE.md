@@ -60,6 +60,9 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
   ramping (`make_cuirass.py`), robe + robe compang-camping (rok kain tabung `wrap`, dorongan radial `axis: pelvis`,
   `make_robe.py`), pelat kaki/sepatu ramping (`make_greaves.py`). Format sel penuh: 16 part (jangan tambah part).
   Panggung Tavern memotong sisi kanvas, bukan mengecilkan karakter (grid putar 162 kolom). Batch 5: flail buatan sendiri (`make_flail.py`), rantai = tali Verlet saat bake (`src/bake/flail.ts`); berayun saat idle/jalan, tapi tidak bisa terseret saat diputar (putar = arah ter-bake).
+- Perbaikan 2026-11-28 (user minta): halo diperkecil, Kapak Ganda digenggam (`grip: [z, x]`), efek flail hanya dari
+  rantai + bola (field layer `fx`), ikon perisai diambil dari arah sebaliknya (sisi luar), sepatu dibuat ulang mengikuti
+  profil kaki (Iron Sabatons gothic vs Duelist Boots kulit sampai lutut). `loadLoadout(file, fallback)` sama dengan portfolio.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)

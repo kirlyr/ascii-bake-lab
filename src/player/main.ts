@@ -3,7 +3,7 @@ import { loadBake, type BakeFile, type TurnFile } from '../shared/format';
 import { createGrid, decodeSprite } from '../shared/compose';
 import { STEP, composeTurn, dragToRotate, normYaw, sideYaw, turnCols, turnSprites } from '../shared/turn';
 import { AsciiCanvas, type ColorMode } from '../shared/ascii-canvas';
-import { AURAS, LEVELS, RUNES, RuneEmitter, alongBlade, alongEdge, type AuraKey, type EffectLevel, type RuneKey, type Spawn } from '../shared/runes';
+import { AURAS, LEVELS, RUNES, RuneEmitter, auraSpawn, runeSpawn, type AuraKey, type EffectLevel, type RuneKey, type Spawn } from '../shared/runes';
 import { BLADE_MATERIALS, DYEABLE, DYES, MATERIALS, type MaterialKey } from '../shared/materials';
 import { SLOTS, itemText } from '../shared/items';
 import { drawIcon, layerParts } from '../shared/icons';
@@ -49,7 +49,8 @@ const state = {
   frame: 0,
 };
 // Titik spawn aura per slot, dihitung ulang tiap compose (frame/equipment/arah berganti).
-const auraSpawn: Record<string, Spawn> = {};
+const auraAt: Record<string, Spawn> = {};
+let runeAt: Spawn = null;
 
 // ── Inventory ────────────────────────────────────────────────────────────────
 // Tiap varian equipment = satu layer bake dengan `slot`. Ganti equipment = ganti daftar layer yang
@@ -66,11 +67,14 @@ let dragging: { item?: string; fromSlot?: string } | null = null;
 const look = () => ({ parts: file.parts, ramp: file.ramp, materials: materialsFor(file, lo) });
 const applyLook = () => {
   view.setLook(look());
-  document.querySelectorAll<HTMLCanvasElement>('canvas[data-icon]').forEach((c) => drawIcon(c, sprite, c.dataset.icon!, look(), +c.dataset.box!));
+  document.querySelectorAll<HTMLCanvasElement>('canvas[data-icon]').forEach((c) => drawIcon(c, iconSprite(c.dataset.icon!), c.dataset.icon!, look(), +c.dataset.box!));
 };
+// Perisai dipakai di lengan kiri, yang di sudut bake menghadap ke belakang (yang terlihat sisi dalamnya).
+// Ikonnya diambil dari arah sebaliknya di file putar supaya muka perisai yang tampil.
+const iconSprite = (key: string) => (file.layers[key].slot === 'offhand' && turnViews?.get(-SIDE)) || sprite;
 const icon = (key: string, box: number) => `<canvas data-icon="${key}" data-box="${box}" aria-hidden="true"></canvas>`;
 const paintIcons = (root: HTMLElement) =>
-  root.querySelectorAll<HTMLCanvasElement>('canvas[data-icon]').forEach((c) => drawIcon(c, sprite, c.dataset.icon!, look(), +c.dataset.box!));
+  root.querySelectorAll<HTMLCanvasElement>('canvas[data-icon]').forEach((c) => drawIcon(c, iconSprite(c.dataset.icon!), c.dataset.icon!, look(), +c.dataset.box!));
 
 function equip(key: string) {
   state.equip[slotOf(key)] = key;
@@ -388,8 +392,9 @@ function compose() {
   composeTurn(grid, sprite, turnViews, state.yaw, state.clip, state.frame, state.equip);
   for (const slot of Object.keys(state.auras)) {
     const layer = state.equip[slot];
-    auraSpawn[slot] = layer ? alongEdge(grid, layer) : null;
+    auraAt[slot] = layer ? auraSpawn(grid, file, layer) : null;
   }
+  runeAt = runeSpawn(grid, file, state.equip.weapon);
 }
 function draw() {
   compose();
@@ -414,8 +419,8 @@ function tick(now: number) {
       changed = true;
     }
     // Sprite berganti di fps bake; partikel rune/aura diupdate tiap rAF supaya halus.
-    state.rune?.update(dt, alongBlade(grid.blade));
-    for (const [slot, a] of Object.entries(state.auras)) a.update(dt, auraSpawn[slot] ?? null);
+    state.rune?.update(dt, runeAt);
+    for (const [slot, a] of Object.entries(state.auras)) a.update(dt, auraAt[slot] ?? null);
     if (changed || state.rune || Object.keys(state.auras).length) paint();
   }
   requestAnimationFrame(tick);
