@@ -1,236 +1,219 @@
 # ascii-bake-lab
 
-Eksperimen pipeline **baked ASCII** untuk portfolio MMORPG medieval: model 3D (glTF) di-render sekali menjadi frame ASCII
-(**shade level + part id + depth** per sel), lalu diputar di browser tanpa Three.js. Glyph dan warna final ditentukan
-**material** di runtime, jadi material bisa diganti tanpa re-bake.
+A **baked ASCII** character pipeline for a medieval MMORPG-themed portfolio. 3D models (glTF/FBX) are rendered once
+into ASCII frames that store a **shade level, part id and depth** per cell, then played back in the browser without
+Three.js. The final glyph and colour come from a **material** at runtime, so equipment, dyes, blade materials and
+particle effects change without re-baking.
 
-![hero idle dan walk](docs/media/hero.png)
+![hero idle and walk](docs/media/hero.png)
 
-## Menjalankan
+## Running it
 
 ```bash
 npm install
 npm run dev
 ```
 
-- `http://localhost:5173/bake.html` → **bake tool** (dev only, pakai Three.js). Atur parameter, klik **Bake**, lalu
-  **Simpan ke public/baked/hero.bake** (endpoint dev di `vite.config.ts`, gzip level 9) atau **Download JSON** (debug).
-- `http://localhost:5173/` → **player** (produksi, tanpa Three.js). Idle/walk, arah kiri/kanan (mirror), equipment per slot, aura per slot, putar 16 arah,
-  material blade (Iron/Steel/Gold/Bloodiron), rune api, mode warna Material/Part/Depth, penanda socket blade.
-  Tahan ← / → untuk berjalan.
-- `npm run build` hanya mem-build player + `home.html`. Three.js tidak ikut.
+- `http://localhost:5173/bake.html` → **bake tool** (dev only, uses Three.js). Tune the parameters, click **Bake**, then
+  save to `public/baked/hero.bake` (a dev endpoint in `vite.config.ts`, gzip level 9) or download JSON for debugging.
+  `/bake.html?model=hero-turn` bakes the 16-direction file.
+- `http://localhost:5173/` → **Tavern player** (production, no Three.js): an inventory-style wardrobe with idle/walk,
+  16-direction turning, equipment per slot, dyes, blade materials, runes and auras. Hold ← / → to walk.
+- `http://localhost:5173/home.html` → **Home prototype**: the same character with the visitor's saved loadout.
+- `npm run build` type-checks and builds only the player and `home.html`. Three.js is not included.
 
-## Cara kerja bake
+## How baking works
 
-1. Load badan (`.gltf`/`.glb`/`.fbx`), animasi dari file terpisah (`animations: { idle: 'file.glb#Clip' }`), outfit skinned
-   yang di-bind ulang ke skeleton badan (`outfits`), dan aksesori yang ditempel ke tulang (`attachments`, mesh-nya
-   bernama `<name>:<material>`). Kamera **orthographic samping** (`yaw -90`, hadap kanan, `pitch 8`).
-2. Framing diukur dari silhouette semua pose (bukan bounding box geometri, karena bbox skinned mesh terlalu longgar).
-   Tinggi model = `rows`. `cols = 0` berarti lebar grid otomatis.
-3. Per layer (badan, armor, helm, senjata) dan per frame: render 3 pass ke render target `cols*6 × rows*12` px
-   (warna lit, depth, part id), lalu tiap sel diringkas jadi. Warna lit dicampur dengan pass tanpa tekstur
-   (`albedo` 0,5): shade level lebih banyak mengikuti pencahayaan daripada warna tekstur, jadi kain gelap tidak jadi
-   glyph jarang. Warna final datang dari material.
-   - **shade level**: shape vector 2×3 region dari kecerahan sub-pixel, dicocokkan ke glyph JetBrains Mono Bold terdekat
-     di ramp `.:-=+*#%@`. Index glyph itu = shade level (0..8). Jadi tepi silhouette dari shape vector tetap terbawa,
-     walau char final baru dipilih di runtime.
-   - **part id**: part mayoritas di sel. Part diatur per mesh di preset (`layers.<x>.parts`). Mesh senjata bisa dibagi dua
-     di sepanjang sumbu lokalnya (`blade: { mesh, axis, at, below, above }`). Pedang Quaternius sudah terpisah per
-     material, jadi `sword:Metal` = blade dan sisanya hilt.
-   - **depth**: 0..254 (255 = kosong), dinormalisasi ke rentang depth model, dikuantisasi per `depthStep` (4 ≈ 1,8 cm)
-     supaya gzip lebih kecil.
-4. Layer senjata juga menyimpan **socket blade** per frame: `base` (titik potong hilt/blade) dan `tip`, dalam koordinat
-   grid `[x, y, depth]`. Dipakai emitter partikel rune.
-5. Frame di-crop ke bounding box sel terisi. Satu byte per sel `part * 16 + shade` + satu byte depth.
-6. Disimpan sebagai container biner `.bake` (`packBake` di `format.ts`): gzip( magic `ASB3` | panjang header |
-   header JSON | plane cell | plane depth ). Header = BakeFile/TurnFile tanpa data frame; tiap frame punya offset `o`.
-   Semua cell dulu lalu semua depth, karena gzip lebih efektif begitu. Player memuat lewat `DecompressionStream`,
-   jadi tidak bergantung pada Content-Encoding server. Delta antar frame sudah diuji dan justru lebih besar
-   (karakter bergerak, XOR jadi noise), jadi tidak dipakai.
+1. Load the body (`.gltf`/`.glb`/`.fbx`), animations from separate files (`animations: { idle: 'file.glb#Clip' }`),
+   skinned outfits re-bound to the body skeleton (`outfits`), and accessories attached to bones (`attachments`, meshes
+   named `<name>:<material>`). The camera is **orthographic, side view** (`yaw -90`, facing right, `pitch 8`).
+2. Framing is measured from the silhouette of every pose, not the geometry bounding box (skinned bounding boxes are
+   too loose). Model height = `rows`; `cols = 0` sizes the grid automatically.
+3. For each layer and frame, three passes are rendered to a `cols*6 × rows*12` px target (lit colour, depth, part id)
+   and summarised per cell. Lit colour is blended with an untextured pass (`albedo` 0.5), so shade follows lighting
+   more than texture colour and dark cloth does not turn into sparse glyphs.
+   - **Shade level**: a 2×3 shape vector of sub-pixel brightness, matched to the closest JetBrains Mono Bold glyph in
+     the ramp `.:-=+*#%@`. That glyph's index (0..8) is the shade level, so silhouette edges survive even though the
+     final character is chosen at runtime.
+   - **Part id**: the majority part in the cell. Parts are set per mesh in the preset (`layers.<x>.parts`). A weapon
+     mesh can be split along a local axis (`blade: { mesh, axis, at, below, above }`).
+   - **Depth**: 0..254 (255 = empty), normalised to the model's depth range and quantised by `depthStep`
+     (4 ≈ 1.8 cm) so gzip compresses it better.
+4. Weapon layers also store a **blade socket** per frame (`base` and `tip` in grid coordinates `[x, y, depth]`),
+   which the rune emitter uses.
+5. Frames are cropped to their filled cells: one byte per cell (`part * 16 + shade`) plus one depth byte.
+6. Everything is written to a binary `.bake` container (`packBake` in `format.ts`): gzip( magic `ASB3` | header length
+   | JSON header | cell plane | depth plane ). All cells come before all depths because gzip does better that way.
+   The player loads it with `DecompressionStream`, so it does not depend on the server's Content-Encoding. Frame
+   deltas were tested and came out larger (a moving character turns XOR into noise), so they are not used.
 
-Format lengkap: `src/shared/format.ts` (BakeFile v2). File v1 (char final) tidak didukung lagi.
+Full format: `src/shared/format.ts` (BakeFile v2).
 
-## Equipment (varian per slot)
+Some items are simulated at bake time: the cloak, long beard and hood cape as cloth (`src/bake/cloth.ts`), and the
+flail chain with Verlet integration (`src/bake/flail.ts`). Chainmail is a copy of the peasant tunic (`copies` in the
+preset) with a ring pattern applied in the bake shader.
 
-Tiap varian equipment = **satu layer bake** dengan field `slot` (`torso`, `legs`, `feet`, `shoulder`, `helmet`,
-`weapon`). Ukuran file = jumlah layer, bukan kombinasi: 21 varian = 21 layer, bukan ribuan kombinasi. Semua varian di-bake
-dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
+## Equipment
 
-- Player memasang maksimal satu layer per slot (`activeLayers` / `defaultEquipment` di `compose.ts`), atau slot
-  dikosongkan ("Lepas"). Ganti equipment = ganti daftar layer yang di-compose, tanpa decode ulang.
-- Tiap layer senjata punya `blade` sendiri (split hilt/blade + sumber socket), jadi material blade dan rune api jalan
-  di semua senjata.
-- Aksesori Knight Pack punya origin + skala sama, jadi satu posisi attach per slot (`helm()` / `weapon()` di preset).
-  Katana diputar 90° di sumbu panjangnya (`spin`) karena sisi lebarnya ada di sumbu lokal lain.
+Every equipment variant is **one bake layer** with a `slot` field. File size grows with the number of layers, not with
+combinations, and all variants are baked in one run so they share framing and depth range. The player composes at most
+one layer per slot (`activeLayers` / `defaultEquipment` in `compose.ts`); swapping equipment only changes which layers
+are composed, with no re-decoding. Every weapon layer has its own blade split and socket, so blade materials and runes
+work on all weapons. Metal parts of blunt weapons count as `blade` (forgeable, rune source); wood stays `wood`.
 
-| Slot | Varian | Part |
-|---|---|---|
-| Baju | Rompi Ranger, Tunik Petani, 5 zirah Ultimate RPG Pack, Zirah Ramping, Jubah Pengembara, Jubah Compang-camping (buatan sendiri), Zirah Rantai (tunik Peasant + pola cincin) | cloth, leather, linen, armor, wool, cloak |
-| Celana | Celana Ranger, Celana Petani, Pelat Kaki, Pelat Kaki Ramping | cloth, wool, armor |
-| Sepatu | Sepatu Ranger, Sepatu Petani, Iron Sabatons (gothic), Duelist Boots (bot kulit sampai lutut + tutup jari besi) | leather, wool, armor |
-| Bahu | Pauldron Ranger, Bahu Ksatria (`ShoulderPads`), Mantel Bulu (buatan sendiri) | armor, wool |
-| Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`), Halo, Tudung gelap + jubah bahu (buatan sendiri) | helmet, trim, gem, cloak |
-| Punggung | Jubah, Fallen Wings, Angel Wings, Broken Wings (buatan sendiri), Busur + tabung panah | cloak, feather, plume, wood, leather, linen |
-| Janggut | Janggut, Janggut Panjang (helai panjang disimulasikan sebagai kain) | hair |
-| Senjata | Pedang, Pedang Pendek, Katana, Gada (Knight Pack); Kapak, Tombak, Palu Perang, Sabit Maut, Claymore, Pedang Besar, Pedang Emas, Belati, Kapak Ganda, Palu Kecil (Modular Weapons Pack); Flail (buatan sendiri) | blade, hilt, wood |
-| Off-hand | Perisai Heater, Heater 2, Bundar, Bundar 2, Kelt (Modular Weapons Pack), di lengan bawah kiri, kosong di susunan bawaan | armor, wood, trim |
+The current bake has **61 items in 10 slots**:
 
-Outfit Ranger dan Peasant memang terdiri dari mesh terpisah per bagian, jadi bisa dipecah ke slot dan di-mix tanpa aset
-baru. Semua layer outfit memakai `bias` 4 cm (badan Superhero lebih besar dari tubuh outfit).
+| Slot | Items |
+|---|---|
+| Head | Iron Helm, Knight Helm, Noble Helm, Gold Crown, Ruby Crown, Halo, Shadow Hood |
+| Hair | Buzzed Hair, Long Hair, Parted Hair |
+| Beard | Beard, Sage Beard |
+| Shoulders | Ranger Pauldron, Knight Pauldrons, Fur Mantle |
+| Chest | Ranger Jerkin, Peasant Tunic, Leather Cuirass, Iron Cuirass, Steel Cuirass, Blackguard Cuirass, Golden Cuirass, Duelist Cuirass, Chainmail Hauberk, Wayfarer Robe, Tattered Shroud |
+| Back | Wanderer Cloak, Fallen Wings, Angel Wings, Broken Wings, Longbow & Quiver |
+| Weapon | Longsword, Shortsword, Katana, Mace, Bearded Axe, Spear, War Hammer, Reaper Scythe, Claymore, Bastard Sword, Gilded Sword, Dagger, Double Axe, Smith Hammer, Flail |
+| Off-hand | Heater Shield, Banded Heater, Round Shield, Painted Round Shield, Celtic Shield |
+| Legs | Ranger Trousers, Woolen Breeches, Iron Greaves, Duelist Cuisses |
+| Feet | Ranger Boots, Wrapped Shoes, Iron Sabatons, Duelist Boots |
 
 ![wardrobe](docs/media/wardrobe.png)
 
-Kiri ke kanan: set Ranger + Helm Bangsawan + Pedang (aura Suci di helm); set Petani + Mahkota Rubi + Sabit (Bloodiron,
-aura Bayangan di senjata); campuran + Bahu Ksatria + Kapak (aura Es di baju); Mahkota + Tombak (Gold, aura Bara);
-Helm Ksatria + Palu Perang (aura Racun di bahu).
+## Dyes and blade materials
 
-Forge berlaku di semua senjata. Senjata tanpa bilah memakai aturan: **bagian logam = part `blade`** (ikut material
-forge + sumber socket rune), kayu tetap `wood`. Gada: paku + cincin kepala; Palu: kepala palu (cincin gagang = hilt);
-Kapak/Tombak/Sabit: mata senjata. Tombak dipegang tegak supaya grid tidak melebar 2 m ke depan; Kapak dan Sabit
-diputar (`spin`) supaya sisi lebar mata senjata menghadap kamera. Pose genggam tetap satu tangan (pose `Sword_Idle`).
+Cloth, leather, linen, wool, plate, helmets, trim, cloaks, feathers, plumage and hair can be dyed from the player (`DYEABLE` in `materials.ts`).
+A dye only swaps the material's colour stops (glyphs still come from the baked ramp), so no re-bake is needed. Fabrics
+use 11 `DYES` (Moss, Crimson, Indigo, Royal purple, Ochre, Tan, Umber, Parchment, Snow, Raven, Charcoal), metal uses
+5 `FINISHES` (Iron, Steel, Bronze, Gold, Blackened), and hair has its own five colours. Dyes apply per part, so every
+item sharing that part changes together.
 
-## Pewarna
+Blades have four forge materials with their own glyph pairs: Iron `#%`, Steel `@%`, Gold `0o`, Bloodiron `B8`.
 
-Kain, kulit samak, linen, wol, pelat bahu, helm, dan hiasan bisa diwarnai dari player (`DYEABLE` di `materials.ts`).
-Pewarna hanya mengganti stop warna material (glyph tetap dari ramp bake), jadi tanpa bake ulang. Kain/kulit memakai
-9 warna `DYES` (Lumut, Darah, Nila, Ungu bangsawan, Oker, Samak, Coklat wol, Perkamen, Arang), logam memakai 5
-`FINISHES` (Besi, Baja, Perunggu, Emas, Hitam). Berlaku per part, jadi semua item dengan part yang sama ikut berubah
-(mis. kain rompi dan celana Ranger).
+![dyes](docs/media/dyes.png)
 
-![pewarna](docs/media/dyes.png)
+## Runes and auras
 
-## Aura
+`src/shared/runes.ts` draws glyph particles in four layers: the cells under each glyph are cleared, a radial-gradient
+halo is added with `lighter` blending (bloom), small glyphs snap to the grid, and occasional 2× glyphs float freely.
 
-Aura = partikel glyph seperti rune, tapi lahir di **tepi silhouette item** (sel milik layer itu yang bertetangga dengan
-sel kosong atau layer lain), bukan di socket blade. Compose kini mencatat layer pemilik tiap sel (`Grid.owner`), dan
-`edgeCells()` mengambil tepinya tiap frame. Tanpa bake ulang dan tanpa menambah ukuran file. Per slot bisa dipilih
-satu aura: Bara, Suci, Es, Bayangan, Racun (`AURAS` di `runes.ts`). Mati total saat `prefers-reduced-motion`.
+- **Runes** spawn along the blade socket: Fire, Lightning, Blood, Venom, Frost.
+- **Auras** spawn on the silhouette edge of an item (cells of that layer next to empty space or another layer), one
+  per slot: Ember, Holy, Frost, Shadow, Venom. Compose records the owning layer of each cell (`Grid.owner`), so this
+  needs no extra data in the file.
+- Intensity per effect: **Faint / Bright / Radiant** (`LEVELS`), scaling particle count, spread, lifetime, large-glyph
+  chance and halo size.
+- A layer with `fx` (a list of parts) emits only from those parts, e.g. the flail emits from its chain and ball, not
+  the handle (`runeSpawn` / `auraSpawn`).
+- Particles update every animation frame (the sprite stays at 12 fps) and turn off completely under
+  `prefers-reduced-motion`.
+
+![effect levels](docs/media/effect-levels.png)
 
 ## Tavern inventory
 
-Player (`/`) = Tavern wardrobe bergaya inventory game (UI berbahasa Inggris, tanpa stats):
-- **Paper doll**: karakter di tengah (tetap bisa diputar), slot Head/Shoulders/Chest kiri, Weapon/Legs/Feet kanan.
-  Klik slot = bag difilter ke slot itu.
-- **Bag**: semua varian equipment sebagai ikon. Klik = detail, double-click/Enter = pakai/lepas, drag ke slot yang
-  cocok atau ke karakter = pakai, drag slot ke bag = lepas (HTML5 drag & drop, desktop dulu).
-- **Detail item**: nama, jenis, deskripsi lore (`src/shared/items.ts`), lalu opsi yang relevan dengan part item itu:
-  material blade, rune (5: Fire, Lightning, Blood, Venom, Frost), pewarna, aura.
-- **Ikon** dibuat runtime dari layer bake itu sendiri (frame idle pertama, di-crop, `src/shared/icons.ts`), jadi tanpa
-  file tambahan dan ikut pewarna/material. Senjata diputar supaya blade menunjuk ke kanan atas.
-- Kontrol debug (clip, arah, mode warna, socket) ada di panel **Dev**.
+The player is a game-style inventory (English UI, no stats):
+
+- **Paper doll**: the character in the centre (still turnable) with slots on both sides. Clicking a slot filters the bag.
+- **Bag**: every variant as an icon. Click to inspect, double-click or Enter to equip or remove, drag onto a matching
+  slot or the character to equip, drag a worn item back to the bag to take it off.
+- **Item detail**: name, type and a short lore line (`src/shared/items.ts`), then the options that apply to that item:
+  blade material, rune, dye, aura and effect level.
+- **Icons** are generated at runtime from the item's own layer (first idle frame, cropped; `src/shared/icons.ts`), so
+  they need no extra files and follow dyes and materials.
+- Debug controls (clip, direction, colour mode, socket markers) live in the **Dev** panel.
 
 ![tavern inventory](docs/media/tavern-inventory.png)
 
-## Efek rune & aura
-
-`RuneEmitter` (`src/shared/runes.ts`) menggambar 4 lapis: sel di bawah glyph dikosongkan, halo (sprite gradien radial,
-blend `lighter`, efek bloom), glyph kecil yang di-snap ke sel, dan sesekali glyph besar 2× yang melayang bebas.
-Intensitas per efek bisa dipilih di panel detail: **Faint / Bright / Radiant** (`LEVELS`), mengalikan jumlah partikel,
-sebaran, umur, peluang glyph besar, dan ukuran halo. Disimpan di loadout (`levels`, key = slot aura atau `rune`).
-Aura lahir di tepi silhouette layer, rune di sepanjang socket blade. Layer dengan `fx` (daftar part) memancarkan
-keduanya hanya dari part itu: flail `fx: ['blade']`, jadi efek keluar dari rantai + bola, bukan gagang
-(`auraSpawn`/`runeSpawn`).
-
-![level efek](docs/media/effect-levels.png)
-
 ## Loadout (Tavern → Home)
 
-Semua pilihan di player (equipment, pewarna, material blade, aura, rune) disimpan sebagai loadout di `localStorage`
-pengunjung (`src/shared/loadout.ts`, key `ascii-hero-loadout`) dan langsung dipulihkan saat halaman dibuka lagi.
-`/home.html` (prototype Home) memuat `hero.bake` dulu (karakter langsung tampil), lalu `hero-turn.bake` di belakang
-layar; setelah itu karakter bisa diputar (drag atau ⟲ ⟳). Memakai loadout yang sama. Jadi player = Tavern = tempat kustomisasi karakter Home. Nilai yang tidak dikenal lagi (layer dihapus, palet
-diganti) jatuh ke default bake. Tiap pengunjung punya loadout sendiri; tanpa loadout tersimpan = susunan default.
+Everything chosen in the player (equipment, dyes, blade material, auras, runes, effect levels) is saved as a loadout in
+the visitor's `localStorage` (`src/shared/loadout.ts`, key `ascii-hero-loadout`) and restored on the next visit.
+`home.html` loads `hero.bake` first so the character appears right away, then `hero-turn.bake` in the background so it
+can be turned (drag or ⟲ ⟳). Values the bake no longer knows (a removed layer, a renamed palette entry) fall back to the
+bake defaults. Each visitor has their own loadout; without one, the default outfit is shown.
 
-![home dengan loadout](docs/media/home-loadout.png)
+![home with loadout](docs/media/home-loadout.png)
 
-## Memutar karakter (16 arah, idle napas)
+## Turning (16 directions, breathing idle)
 
-Preset `hero-turn` (`/bake.html?model=hero-turn`) mem-bake **4 frame idle** (merata sepanjang clip, `stillFrames: 4`) dari **16 arah penuh** (`views`: 0°, −22,5° … −337,5°),
-semua layer equipment, ke `public/baked/hero-turn.bake` (`TurnFile`). Tanpa mirror: karakter tidak simetris
-(pauldron satu sisi, senjata di tangan kanan), jadi mirror membuat item pindah sisi saat diputar. Semua arah berbagi
-framing, rentang depth, dan auto-level; grid dipusatkan ke origin model supaya karakter tidak bergeser saat diputar.
+The `hero-turn` preset bakes **4 idle frames** (`stillFrames: 4`) from **16 full directions** (`views`: 0°, −22.5° …
+−337.5°) for every layer into `public/baked/hero-turn.bake` (`TurnFile`). There is no mirroring: the character is not
+symmetric (one-sided pauldron, weapon in the right hand), and mirroring made items jump sides while turning. All
+directions share framing, depth range and auto-levels, and the grid is centred on the model origin so the character
+does not shift while turning.
 
-Player: drag karakter atau tombol ⟲ ⟳ (per 22,5°). Arah bake (−90°) memakai `hero.bake` yang beranimasi
-(idle/walk); berjalan ke arah sebaliknya = `hero.bake` di-mirror (seperti game 2D). Arah lain, termasuk +90° saat idle, memutar 4 frame idle itu (±1,6 fps, satu siklus napas 2,5 detik). Kedua file disejajarkan lewat `origin` (titik antara kaki, di grid) yang kini
-disimpan tiap BakeFile. Di portfolio, `hero-turn.bake` cukup dimuat di Tavern.
+In the player, drag the character or use ⟲ ⟳ (22.5° steps). The baked side view (−90°) uses the animated `hero.bake`
+(idle and walk); walking the other way mirrors `hero.bake`, as in a 2D game. Every other direction cycles the four idle
+frames (one breath every 2.5 s). Both files are aligned through `origin` (the point between the feet, stored in every
+BakeFile).
 
-![16 arah, ditampilkan 8](docs/media/turn.png)
+![16 directions, 8 shown](docs/media/turn.png)
 
 ## Runtime
 
-- `src/shared/compose.ts`: tiap sel pilih layer dengan depth terkecil, dikurangi `bias` layer (armor menang atas kulit
-  yang hanya ≤ 4 cm di depannya). Mirror = balik kolom; socket ikut di-mirror.
-- `src/shared/materials.ts`: material = glyph per shade level + stop warna gelap→terang. Look default per part
-  (kulit, pelat, kain, kulit samak, kayu) plus 4 material blade dari reel ansenjeo (`#%` Iron, `@%` Steel, `0o` Gold,
-  `B8` Bloodiron). Level rendah tetap `.:-=` supaya tepi tidak hilang.
-- `src/shared/ascii-canvas.ts`: material dikompilasi jadi tabel 256 entri (byte sel → glyph + warna), jadi ganti material
-  = bangun ulang tabel, tanpa decode ulang frame. Glyph asimetris ditukar saat mirror (`/`↔`\`, dst).
-- `src/shared/runes.ts`: rune api = emitter partikel glyph (`^^*:.`) di sepanjang socket blade, warna sesuai umur + glow.
-  Partikel diupdate tiap rAF (sprite tetap 12 fps) dan **mati total saat `prefers-reduced-motion`**.
+- `src/shared/compose.ts`: each cell takes the layer with the smallest depth minus the layer's `bias`, so armour wins
+  over skin that is only a few centimetres in front of it. Mirroring flips columns and sockets.
+- `src/shared/materials.ts`: a material is a glyph per shade level plus dark → light colour stops, with defaults per
+  part (skin, plate, cloth, leather, wood, …). Low levels stay `.:-=` so edges never disappear.
+- `src/shared/ascii-canvas.ts`: materials compile into a 256-entry table (cell byte → glyph + colour), so changing a
+  material rebuilds the table without re-decoding frames. Asymmetric glyphs are swapped when mirrored (`/` ↔ `\`, …).
+- `src/shared/runes.ts`: rune and aura emitters (see above).
 
-## Karakter
+## Character and assets
 
-Satu karakter proporsi realistis (bukan chibi), tinggi 90 baris. Semua aset **CC0** dari Quaternius:
+One realistically proportioned character (not chibi), 90 rows tall. Third-party assets are **CC0** from Quaternius;
+everything marked "own" was generated procedurally by a script in its folder.
 
-| Layer | Aset | Folder |
+| Layer | Source | Folder |
 |---|---|---|
-| Badan | Universal Base Characters, `Superhero_Male` | `assets/models/quaternius-ubc/` |
-| Animasi | Universal Animation Library, `Idle_Loop` + `Walk_Loop` + `Sword_Idle` (dipangkas, 540 KB) | `assets/models/quaternius-ubc/` |
-| Baju, celana, sepatu, bahu | Modular Character Outfits – Fantasy, outfit `Male_Ranger` + `Male_Peasant` | `assets/models/quaternius-outfits/` |
-| Helm, pedang, bahu | Animated Knight Pack (`Helmet1–3`, `Sword`, `ShortSword`, `Katana`, `Club`, `ShoulderPads`) | `assets/models/quaternius/` |
-| Kapak, tombak, palu, sabit, senjata tambahan, perisai, mahkota | Modular Weapons Pack + Ultimate RPG Pack | `assets/models/quaternius-weapons/` |
-| Zirah dada (5) | Ultimate RPG Pack (`Armor_*`, item statis di `spine_03`) | `assets/models/quaternius-weapons/` |
-| Jubah | buatan sendiri, prosedural (`make_cloak.py`), disimulasikan sebagai kain saat bake (`src/bake/cloth.ts`) | `assets/models/cloak/` |
-| Sayap bulu (terlipat) | buatan sendiri, prosedural (`make_wings.py`) | `assets/models/wings/` |
-| Pelat kaki + sepatu besi | buatan sendiri, prosedural (`make_greaves.py`) | `assets/models/greaves/` |
-| Sayap malaikat terbuka + sayap rusak | buatan sendiri, prosedural (`make_wings.py`) | `assets/models/wings/` |
-| Halo + janggut panjang | buatan sendiri, prosedural (`make_accessories.py`), janggut disimulasikan sebagai kain | `assets/models/accessories/` |
-| Zirah ramping | buatan sendiri, prosedural (`make_cuirass.py`) | `assets/models/cuirass/` |
-| Robe + robe compang-camping | buatan sendiri, prosedural (`make_robe.py`), rok kain tabung (`wrap`, `axis: pelvis`) | `assets/models/robe/` |
-| Tudung + jubah bahu | buatan sendiri, prosedural (`make_hood.py`), jubah bahu disimulasikan sebagai kain | `assets/models/hood/` |
-| Mantel bulu | buatan sendiri, prosedural (`make_mantle.py`) | `assets/models/mantle/` |
-| Tabung panah (+ busur Ultimate RPG Pack) | buatan sendiri, prosedural (`make_quiver.py`) | `assets/models/quiver/` |
-| Chainmail | salinan tunik Peasant (`copies` di preset) dengan pola cincin rantai di shader saat bake | — |
-| Flail | buatan sendiri, prosedural (`make_flail.py`), rantai disimulasikan Verlet saat bake (`src/bake/flail.ts`) | `assets/models/flail/` |
+| Body | Universal Base Characters, `Superhero_Male` | `assets/models/quaternius-ubc/` |
+| Animation | Universal Animation Library: `Idle_Loop`, `Walk_Loop`, `Sword_Idle` (trimmed) | `assets/models/quaternius-ubc/` |
+| Ranger and peasant outfits | Modular Character Outfits – Fantasy (`Male_Ranger`, `Male_Peasant`) | `assets/models/quaternius-outfits/` |
+| Helmets, swords, katana, mace, knight pauldrons | Animated Knight Pack | `assets/models/quaternius/` |
+| Axes, spear, hammers, scythe, extra swords, shields, crowns, cuirasses, bow | Modular Weapons Pack + Ultimate RPG Pack | `assets/models/quaternius-weapons/` |
+| Cloak | own (`make_cloak.py`), cloth-simulated at bake time | `assets/models/cloak/` |
+| Fallen, Angel and Broken wings | own (`make_wings.py`) | `assets/models/wings/` |
+| Iron greaves and sabatons | own (`make_greaves.py`) | `assets/models/greaves/` |
+| Halo and long beard | own (`make_accessories.py`), beard cloth-simulated | `assets/models/accessories/` |
+| Duelist cuirass | own (`make_cuirass.py`) | `assets/models/cuirass/` |
+| Wayfarer robe and tattered shroud | own (`make_robe.py`) | `assets/models/robe/` |
+| Shadow hood and cape | own (`make_hood.py`), cape cloth-simulated | `assets/models/hood/` |
+| Fur mantle | own (`make_mantle.py`) | `assets/models/mantle/` |
+| Quiver | own (`make_quiver.py`) | `assets/models/quiver/` |
+| Flail | own (`make_flail.py`), chain simulated with Verlet | `assets/models/flail/` |
 
-Sumber unduhan dan catatan lisensi ada di `SOURCE.md` tiap folder (diambil dari mirror GitHub karena situs Quaternius
-tidak bisa diakses dari cloud). Versi gratis Modular Outfits hanya berisi Ranger dan Peasant; outfit armor penuh ada di
-versi berbayar.
+Download sources and licence notes are in each folder's `SOURCE.md` (taken from GitHub mirrors because the Quaternius
+site was not reachable from the build environment). The free Modular Outfits pack only contains the ranger and peasant
+outfits.
 
-Perbaikan karakter (PR #5):
-- **Genggaman pedang**: animasi idle/walk gratis tidak menggenggam senjata. Lengan kanan + jari dikunci ke pose frame 0
-  `Sword_Idle` (`overlays` di preset), jadi tangan mengepal di hilt dan pedang tidak ikut ayunan lengan saat walk.
-  Blade turun ke depan (rotasi attach `[25, 0, 90]`), sisi lebar menghadap kamera.
-- **Kulit tembus rompi**: badan Superhero lebih besar dari tubuh untuk outfit Ranger. Outfit digelembungkan 2 cm di
-  sepanjang normal saat bake (`outfitInflate`), plus `bias` 4 cm di layer armor saat compose. Kulit yang masih
-  terlihat = lengan (outfit tanpa lengan), leher, wajah.
-- **Warna**: palet material per part di-tuning ke palet medieval (kain lumut, kulit samak, parchment, kulit hangat),
-  stop paling gelap dinaikkan supaya glyph tepi tetap terbaca.
+Character fixes worth knowing about:
 
-![sebelum dan sesudah](docs/media/hero-before-after.png)
+- **Sword grip**: the free idle/walk clips do not hold a weapon, so the right arm and fingers are locked to frame 0 of
+  `Sword_Idle` (`overlays` in the preset). The hand closes on the hilt and the sword does not swing with the arm.
+- **Skin poking through clothes**: the body is larger than the outfit's base body, so outfits are inflated 2 cm along
+  their normals at bake time (`outfitInflate`) and armour layers get a 4 cm `bias` when composing.
 
-## Hasil saat ini (hero, 36 layer × 2 clip @12fps)
+![before and after](docs/media/hero-before-after.png)
+
+## Current output
 
 | | |
 |---|---|
-| Grid | 95 × 90 (`hero-turn`: 148 × 90, simetris di origin) |
-| `hero.bake` | 59 layer × 2 clip = **516 KB** (22 layer: 195 KB; JSON base64 + gzip dulu: 280 KB) |
-| `hero-turn.bake` | 16 arah × 59 layer × 4 frame = **890 KB** (grid 162 kolom: sayap malaikat) (22 layer: 342 KB) |
-| Player JS | 13,7 KB (6,1 KB gzip), tanpa Three.js |
+| Grid | 107 × 90 (`hero-turn`: 162 × 90, symmetric around the origin, wide enough for open wings) |
+| `hero.bake` | 60 layers × 2 clips (idle, walk) @ 12 fps = **555 KB** |
+| `hero-turn.bake` | 16 directions × 60 layers × 4 frames = **1.0 MB** |
+| Player + Home JS | ~37 KB (~15.5 KB gzip), no Three.js |
 
-Untuk portfolio: Home cukup memuat set default (bisa jadi preset bake terpisah, ±100 KB gzip); file lengkap dan
-`hero-turn.bake` hanya di Tavern. Kalau masih terasa berat: file per layer yang dimuat saat dipilih.
+The portfolio loads `hero.bake` for the character and only fetches `hero-turn.bake` where turning is needed. Ideas not
+yet implemented: a lower frame rate (8–10 fps) and per-layer files loaded on demand.
 
-Ruang optimasi lain yang belum dikerjakan: fps 8–10, file per layer (lazy).
-
-## Struktur
+## Project layout
 
 ```
 bake.html, src/bake/        bake tool (Three.js, dev only)
-index.html, src/player/     player (produksi)
-home.html, src/home/        prototype Home: karakter dengan loadout dari Tavern
-src/shared/                 format .bake, compose, loadout, renderer canvas (tanpa Three.js)
-public/baked/*.bake         hasil bake (container biner gzip)
-assets/models/quaternius*/  model CC0 + SOURCE.md
-docs/PLAN.md                rencana portfolio lengkap
+index.html, src/player/     Tavern player (production)
+home.html, src/home/        Home prototype: character with the saved loadout
+src/shared/                 .bake format, compose, loadout, items, icons, runes, canvas renderer (no Three.js)
+public/baked/*.bake         baked output (gzip binary container)
+assets/models/*/            CC0 and procedural models, each with SOURCE.md or a generator script
+docs/PLAN.md                original portfolio plan (Indonesian)
 ```
