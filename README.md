@@ -65,12 +65,12 @@ dalam satu run, jadi framing kamera dan rentang depth sama untuk semua varian.
 
 | Slot | Varian | Part |
 |---|---|---|
-| Baju | Rompi Ranger, Tunik Petani, 5 zirah Ultimate RPG Pack, Zirah Ramping, Jubah Pengembara, Jubah Compang-camping (buatan sendiri) | cloth, leather, linen, armor, wool, cloak |
+| Baju | Rompi Ranger, Tunik Petani, 5 zirah Ultimate RPG Pack, Zirah Ramping, Jubah Pengembara, Jubah Compang-camping (buatan sendiri), Zirah Rantai (tunik Peasant + pola cincin) | cloth, leather, linen, armor, wool, cloak |
 | Celana | Celana Ranger, Celana Petani, Pelat Kaki, Pelat Kaki Ramping | cloth, wool, armor |
 | Sepatu | Sepatu Ranger, Sepatu Petani, Iron Sabatons (gothic), Duelist Boots (bot kulit sampai lutut + tutup jari besi) | leather, wool, armor |
-| Bahu | Pauldron Ranger, Bahu Ksatria (`ShoulderPads`) | armor |
-| Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`), Halo (buatan sendiri) | helmet, trim, gem |
-| Punggung | Jubah, Fallen Wings, Angel Wings, Broken Wings (semua buatan sendiri) | cloak, feather, plume, wood |
+| Bahu | Pauldron Ranger, Bahu Ksatria (`ShoulderPads`), Mantel Bulu (buatan sendiri) | armor, wool |
+| Helm | Helm Besi, Helm Ksatria, Helm Bangsawan (`Helmet1–3`), Mahkota, Mahkota Rubi (`Crown`, `Crown2`), Halo, Tudung gelap + jubah bahu (buatan sendiri) | helmet, trim, gem, cloak |
+| Punggung | Jubah, Fallen Wings, Angel Wings, Broken Wings (buatan sendiri), Busur + tabung panah | cloak, feather, plume, wood, leather, linen |
 | Janggut | Janggut, Janggut Panjang (helai panjang disimulasikan sebagai kain) | hair |
 | Senjata | Pedang, Pedang Pendek, Katana, Gada (Knight Pack); Kapak, Tombak, Palu Perang, Sabit Maut, Claymore, Pedang Besar, Pedang Emas, Belati, Kapak Ganda, Palu Kecil (Modular Weapons Pack); Flail (buatan sendiri) | blade, hilt, wood |
 | Off-hand | Perisai Heater, Heater 2, Bundar, Bundar 2, Kelt (Modular Weapons Pack), di lengan bawah kiri, kosong di susunan bawaan | armor, wood, trim |
@@ -187,6 +187,10 @@ Satu karakter proporsi realistis (bukan chibi), tinggi 90 baris. Semua aset **CC
 | Halo + janggut panjang | buatan sendiri, prosedural (`make_accessories.py`), janggut disimulasikan sebagai kain | `assets/models/accessories/` |
 | Zirah ramping | buatan sendiri, prosedural (`make_cuirass.py`) | `assets/models/cuirass/` |
 | Robe + robe compang-camping | buatan sendiri, prosedural (`make_robe.py`), rok kain tabung (`wrap`, `axis: pelvis`) | `assets/models/robe/` |
+| Tudung + jubah bahu | buatan sendiri, prosedural (`make_hood.py`), jubah bahu disimulasikan sebagai kain | `assets/models/hood/` |
+| Mantel bulu | buatan sendiri, prosedural (`make_mantle.py`) | `assets/models/mantle/` |
+| Tabung panah (+ busur Ultimate RPG Pack) | buatan sendiri, prosedural (`make_quiver.py`) | `assets/models/quiver/` |
+| Chainmail | salinan tunik Peasant (`copies` di preset) dengan pola cincin rantai di shader saat bake | — |
 | Flail | buatan sendiri, prosedural (`make_flail.py`), rantai disimulasikan Verlet saat bake (`src/bake/flail.ts`) | `assets/models/flail/` |
 
 Sumber unduhan dan catatan lisensi ada di `SOURCE.md` tiap folder (diambil dari mirror GitHub karena situs Quaternius

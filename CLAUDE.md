@@ -63,6 +63,10 @@ ASCII**; hasilnya nanti dipindah ke repo portfolio baru (belum dibuat).
 - Perbaikan 2026-11-28 (user minta): halo diperkecil, Kapak Ganda digenggam (`grip: [z, x]`), efek flail hanya dari
   rantai + bola (field layer `fx`), ikon perisai diambil dari arah sebaliknya (sisi luar), sepatu dibuat ulang mengikuti
   profil kaki (Iron Sabatons gothic vs Duelist Boots kulit sampai lutut). `loadLoadout(file, fallback)` sama dengan portfolio.
+- Tambahan 2026-11-28 (user setuju rekomendasi): tudung gelap + jubah bahu kain (`make_hood.py`), mantel bulu
+  (`make_mantle.py`), chainmail (salinan tunik Peasant lewat `copies`, pola cincin di shader bake), busur Quaternius +
+  tabung panah (`make_quiver.py`). Opsi lain yang ditawarkan tapi belum dibuat: helm bertanduk, mahkota duri, topeng
+  tengkorak/plague doctor, pauldron berduri/tulang, gambeson, zirah tulang, pedang besar di punggung, sayap kelelawar, panji.
 - Belum ada repo portfolio. Konten pribadi masih placeholder.
 
 ## Langkah berikutnya (tunggu user bilang siap)
