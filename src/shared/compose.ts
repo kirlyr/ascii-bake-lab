@@ -81,6 +81,7 @@ export function composeFrame(sprite: Sprite, grid: Grid, clip: string, frame: nu
   grid.owner.fill(0);
   grid.layers = activeLayers;
   const { cols } = sprite.file;
+  const defs = activeLayers.map((lk) => sprite.file.layers[lk]);
   for (const [li, lk] of activeLayers.entries()) {
     const frames = sprite.layers[lk]?.[clip];
     if (!frames?.length) continue;
@@ -101,7 +102,10 @@ export function composeFrame(sprite: Sprite, grid: Grid, clip: string, frame: nu
         const gx = (mirror ? cols - 1 - sx : sx) + offsetX;
         if (gx < 0 || gx >= grid.cols) continue;
         const gi = gy * grid.cols + gx;
-        if (d >= grid.depth[gi]) continue;
+        // `over`: prioritas tambahan antar slot tertentu (mis. jubah di atas rompi), dua arah.
+        const o = grid.owner[gi];
+        const extra = o ? (defs[li].over?.[defs[o - 1].slot ?? ''] ?? 0) - (defs[o - 1].over?.[defs[li].slot ?? ''] ?? 0) : 0;
+        if (d - extra >= grid.depth[gi]) continue;
         grid.depth[gi] = d;
         grid.cell[gi] = f.cell[i];
         grid.owner[gi] = li + 1;
